@@ -2,6 +2,7 @@
 import json
 import logging
 import re
+import threading
 from datetime import datetime
 
 import requests
@@ -13,9 +14,32 @@ from position_sizing import get_sizing_summary
 
 logger = logging.getLogger(__name__)
 
+# Thread-local storage so call_ollama knows which task is running and
+# can bail out early when a stop is requested.
+_thread_local = threading.local()
+
+
+class TaskCancelledError(Exception):
+    """Raised when a task's stop flag is set."""
+
+
+def set_current_task_id(task_id: str | None):
+    """Set the task_id for the current thread (called by scheduler/API wrappers)."""
+    _thread_local.task_id = task_id
+
 
 def call_ollama(prompt: str, system: str = config.SYSTEM_PROMPT, model: str | None = None, timeout: int | None = None) -> str:
     """Send a prompt to Ollama and return the response text."""
+    # Check cancellation before the (potentially very long) HTTP call
+    task_id = getattr(_thread_local, "task_id", None)
+    if task_id:
+        try:
+            from api import is_task_cancelled
+            if is_task_cancelled(task_id):
+                raise TaskCancelledError(f"Task {task_id} was cancelled")
+        except ImportError:
+            pass
+
     url = f"{config.OLLAMA_BASE_URL}/api/generate"
     payload = {
         "model": model or config.TRADER_MODEL_NAME,

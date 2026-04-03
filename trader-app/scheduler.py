@@ -69,6 +69,15 @@ def _save_task_history(history: list[dict]):
 def _tracked(task_id: str, task_name: str, func):
     """Wrap a task function to record execution in the shared task history."""
     def wrapper():
+        from agent import set_current_task_id, TaskCancelledError
+        set_current_task_id(task_id)
+        # Clear any leftover cancellation flag from a previous run
+        try:
+            from api import clear_task_cancelled
+            clear_task_cancelled(task_id)
+        except ImportError:
+            pass
+
         history = _load_task_history()
         entry = {
             "task_id": task_id,
@@ -84,11 +93,16 @@ def _tracked(task_id: str, task_name: str, func):
         try:
             func()
             entry["status"] = "completed"
+        except TaskCancelledError:
+            logger.info(f"Scheduled task {task_id} was cancelled by user")
+            entry["status"] = "cancelled"
+            entry["error"] = "Stopped by user"
         except Exception as e:
             logger.error(f"Scheduled task {task_id} failed: {e}")
             entry["status"] = "failed"
             entry["error"] = str(e)
         finally:
+            set_current_task_id(None)
             entry["finished_at"] = datetime.now().isoformat()
             # Re-load in case manual runs happened concurrently
             history = _load_task_history()

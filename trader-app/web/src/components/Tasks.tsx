@@ -101,7 +101,7 @@ export default function Tasks() {
                 <> · Finished: {new Date(task.last_run.finished_at).toLocaleString()}</>
               )}
               {task.last_run?.status && (
-                <> · <span className={`badge ${task.last_run.status === "completed" ? "badge-green" : task.last_run.status === "failed" ? "badge-red" : "badge-yellow"}`}>
+                <> · <span className={`badge ${task.last_run.status === "completed" ? "badge-green" : task.last_run.status === "failed" || task.last_run.status === "cancelled" ? "badge-red" : "badge-yellow"}`}>
                   {task.last_run.status}
                 </span></>
               )}
@@ -151,7 +151,7 @@ export default function Tasks() {
                 <tr key={i}>
                   <td style={{ fontWeight: 600 }}>{entry.task_name}</td>
                   <td>
-                    <span className={`badge ${entry.status === "completed" ? "badge-green" : entry.status === "failed" ? "badge-red" : "badge-yellow"}`}>
+                    <span className={`badge ${entry.status === "completed" ? "badge-green" : entry.status === "failed" || entry.status === "cancelled" ? "badge-red" : "badge-yellow"}`}>
                       {entry.status}
                     </span>
                   </td>

@@ -66,6 +66,7 @@ app.add_middleware(
 _running_tasks: dict[str, threading.Thread] = {}
 _task_history: list[dict] = []
 _task_lock = threading.Lock()
+_cancelled_tasks: set[str] = set()
 
 # Max entries to keep in the history file to prevent unbounded growth
 _TASK_HISTORY_MAX = 500
@@ -128,8 +129,26 @@ def _save_task_history():
 _load_task_history()
 
 
+def is_task_cancelled(task_id: str) -> bool:
+    """Check whether a stop has been requested for *task_id*.
+
+    Importable by agent modules so long-running steps (e.g. LLM calls)
+    can bail out early.
+    """
+    return task_id in _cancelled_tasks
+
+
+def clear_task_cancelled(task_id: str):
+    """Remove the cancellation flag (called when a new run starts)."""
+    _cancelled_tasks.discard(task_id)
+
+
 def _run_task_in_thread(task_id: str, task_name: str, func):
     """Run an agent task in a background thread, tracking status."""
+    global _task_history
+    from agent import set_current_task_id, TaskCancelledError
+    clear_task_cancelled(task_id)
+    set_current_task_id(task_id)
     start_time = datetime.now().isoformat()
     entry = {
         "task_id": task_id,
@@ -147,11 +166,16 @@ def _run_task_in_thread(task_id: str, task_name: str, func):
         func()
         final_status = "completed"
         final_error = None
+    except TaskCancelledError:
+        logger.info(f"Task {task_id} was cancelled by user")
+        final_status = "cancelled"
+        final_error = "Stopped by user"
     except Exception as e:
         logger.error(f"Task {task_id} failed: {e}")
         final_status = "failed"
         final_error = str(e)
     finally:
+        set_current_task_id(None)
         finished_at = datetime.now().isoformat()
         with _task_lock:
             _running_tasks.pop(task_id, None)
@@ -159,7 +183,6 @@ def _run_task_in_thread(task_id: str, task_name: str, func):
             # concurrent _sync_task_history() calls can't orphan our
             # in-memory reference (the entry we appended above may no
             # longer be in _task_history if _sync replaced the list).
-            global _task_history
             _task_history = _read_task_history_from_disk()
             for h in reversed(_task_history):
                 if h["task_id"] == task_id and h["started_at"] == start_time:
@@ -543,13 +566,37 @@ def invoke_task(task_id: str):
 
 @app.post("/api/tasks/{task_id}/stop")
 def stop_task(task_id: str):
-    """Request to stop a running task. Note: thread-based tasks can't be
-    forcefully killed, but this marks them for cleanup."""
+    """Request to stop a running task.
+
+    Sets a cancellation flag that agent code checks before expensive
+    operations (e.g. LLM calls).  Also marks the task-history entry as
+    'cancelled' so the dashboard updates immediately.
+    """
+    if task_id not in TASK_REGISTRY:
+        raise HTTPException(404, f"Unknown task: {task_id}")
+
     with _task_lock:
-        if task_id not in _running_tasks:
-            raise HTTPException(404, f"Task {task_id} is not running")
-        # We can't truly kill a thread in Python, but we remove tracking
+        # Check if the task is actually running (manual thread or scheduler)
+        thread_alive = task_id in _running_tasks and _running_tasks[task_id].is_alive()
+        history_running = any(
+            e["task_id"] == task_id and e.get("status") == "running"
+            for e in reversed(_task_history)
+        )
+        if not thread_alive and not history_running:
+            raise HTTPException(409, f"Task {task_id} is not currently running")
+
+        _cancelled_tasks.add(task_id)
         _running_tasks.pop(task_id, None)
+
+        # Mark the latest running history entry as cancelled
+        for entry in reversed(_task_history):
+            if entry["task_id"] == task_id and entry.get("status") == "running":
+                entry["status"] = "cancelled"
+                entry["finished_at"] = datetime.now().isoformat()
+                entry["error"] = "Stopped by user"
+                break
+        _save_task_history()
+
     return {"status": "stop_requested", "task_id": task_id}
 
 
