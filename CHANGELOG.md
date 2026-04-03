@@ -18,6 +18,7 @@
 - Fixed portfolio history chart showing identical data for all time ranges — backend now uses timezone-aware date filtering
 
 ### Added
+- Finnhub real-time quotes — new `get_finnhub_quote()` in `market_data.py` calls the `/quote` endpoint as a Level 0 price source before the existing yfinance fallback chain; `fetch_instrument_prices()` uses Finnhub's `h`/`l`/`d`/`dp` fields for high, low, change, and change percent when available, still falling back to yfinance for 5-day momentum and volume; only attempted for the 20 ETF tickers in `INSTRUMENTS` (indices are skipped to avoid Finnhub symbol-format mismatches); gracefully degrades when `FINNHUB_API_KEY` is unset, the price is zero, or the API returns 429
 - Real-time intraday prices — `fetch_instrument_prices()` and `fetch_index_levels()` now use a three-level fallback (`fast_info` → 1m bar → daily close) with a `price_source` field for data freshness visibility
 - Adaptive score dimension weights — new `score_weights.py` module learns per-instrument weights from trade outcomes; weights are injected into the LLM prompt and displayed on the Performance page
 - Portfolio stress test panel — three scenarios (SPY -5%, VIX spike to 30, tech sector rotation) with stop-breach detection, shown on the Risk page with 5-minute caching

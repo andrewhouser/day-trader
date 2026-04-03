@@ -1,19 +1,66 @@
-"""Market data fetching module using yfinance."""
+"""Market data fetching module using yfinance with optional Finnhub real-time quotes."""
 import logging
+import os
 from datetime import datetime, timedelta
 
 import numpy as np
 import pandas as pd
+import requests
 import yfinance as yf
 
 import config
 
 logger = logging.getLogger(__name__)
 
+FINNHUB_KEY = os.getenv("FINNHUB_API_KEY", "")
+FINNHUB_BASE = "https://finnhub.io/api/v1"
+
+# Tickers eligible for Finnhub quotes (ETFs only; indices use different
+# symbology on Finnhub and the free tier may not support them).
+_FINNHUB_ELIGIBLE = set(config.INSTRUMENTS.keys())
+
+
+def get_finnhub_quote(symbol: str) -> tuple[dict | None, str]:
+    """Fetch a real-time quote from Finnhub's /quote endpoint.
+
+    Returns (quote_dict, source_label).  *quote_dict* contains the raw
+    JSON fields (c, h, l, d, dp, pc) when the call succeeds, or *None*
+    on any failure.  The caller decides which fields to use.
+    """
+    if not FINNHUB_KEY:
+        return None, "unavailable"
+    try:
+        resp = requests.get(
+            f"{FINNHUB_BASE}/quote",
+            params={"symbol": symbol, "token": FINNHUB_KEY},
+            timeout=10,
+        )
+        if resp.status_code == 429:
+            logger.warning(f"[finnhub] rate-limited on quote for {symbol}")
+            return None, "unavailable"
+        resp.raise_for_status()
+        data = resp.json()
+        price = data.get("c")
+        if not price:
+            return None, "unavailable"
+        return data, "finnhub_live"
+    except Exception as exc:
+        logger.debug(f"[finnhub] quote error for {symbol}: {exc}")
+        return None, "unavailable"
+
 
 def _get_live_price(ticker: yf.Ticker, ticker_sym: str) -> tuple[float | None, str]:
-    """Try to get the most current price using a three-level fallback.
-    Returns (price, source) where source is 'live', 'intraday', or 'daily_close'."""
+    """Try to get the most current price using a multi-level fallback.
+    Returns (price, source) where source is 'finnhub_live', 'live',
+    'intraday', or 'daily_close'."""
+    # Level 0: Finnhub real-time quote (ETFs only, skipped when key is unset)
+    if FINNHUB_KEY and ticker_sym in _FINNHUB_ELIGIBLE:
+        fh_data, fh_src = get_finnhub_quote(ticker_sym)
+        if fh_data is not None:
+            price = round(float(fh_data["c"]), 2)
+            logger.debug(f"{ticker_sym}: live price ${price:.2f} via finnhub_live")
+            return price, fh_src
+
     # Level 1: fast_info (real-time quote)
     try:
         price = ticker.fast_info.get("last_price") or ticker.fast_info.get("lastPrice")
@@ -91,11 +138,31 @@ def fetch_instrument_prices() -> dict:
         try:
             ticker = yf.Ticker(ticker_sym)
 
-            # Get live price via fallback chain
-            current, price_source = _get_live_price(ticker, ticker_sym)
+            # --- Attempt Finnhub quote first (gives price + h/l/d/dp) ---
+            fh_data: dict | None = None
+            if FINNHUB_KEY and ticker_sym in _FINNHUB_ELIGIBLE:
+                fh_data, fh_src = get_finnhub_quote(ticker_sym)
 
-            # Get 5d daily history for change and momentum calculations
+            if fh_data is not None:
+                current = round(float(fh_data["c"]), 2)
+                price_source = fh_src
+                logger.debug(f"{ticker_sym}: live price ${current:.2f} via finnhub_live")
+                # Use Finnhub's intraday fields directly
+                high = round(float(fh_data.get("h") or current), 2)
+                low = round(float(fh_data.get("l") or current), 2)
+                change = round(float(fh_data.get("d") or 0), 2)
+                change_pct = round(float(fh_data.get("dp") or 0), 2)
+            else:
+                # Fall back to yfinance price chain
+                current, price_source = _get_live_price(ticker, ticker_sym)
+                high = None
+                low = None
+                change = None
+                change_pct = None
+
+            # Get 5d daily history for momentum and volume (always from yfinance)
             hist_5d = ticker.history(period="5d")
+
             if current is None:
                 if hist_5d.empty:
                     results[ticker_sym] = {"error": "No data available"}
@@ -103,9 +170,11 @@ def fetch_instrument_prices() -> dict:
                 current = round(float(hist_5d["Close"].iloc[-1]), 2)
                 price_source = "daily_close"
 
-            prev = float(hist_5d["Close"].iloc[-2]) if len(hist_5d) > 1 else current
-            change = current - prev
-            change_pct = (change / prev) * 100 if prev else 0
+            # Compute change from yfinance when Finnhub didn't supply it
+            if change is None:
+                prev = float(hist_5d["Close"].iloc[-2]) if len(hist_5d) > 1 else current
+                change = round(current - prev, 2)
+                change_pct = round((change / prev) * 100 if prev else 0, 2)
 
             # 5-day momentum from daily bars
             if len(hist_5d) >= 5:
@@ -113,27 +182,37 @@ def fetch_instrument_prices() -> dict:
             else:
                 five_day_change = 0
 
-            # Today's session high/low from daily bar (not 1m bars)
-            hist_today = ticker.history(period="1d", interval="1d")
-            if not hist_today.empty:
-                high = round(float(hist_today["High"].iloc[-1]), 2)
-                low = round(float(hist_today["Low"].iloc[-1]), 2)
-                volume = int(hist_today["Volume"].iloc[-1]) if "Volume" in hist_today else None
-            elif not hist_5d.empty:
-                high = round(float(hist_5d["High"].iloc[-1]), 2)
-                low = round(float(hist_5d["Low"].iloc[-1]), 2)
-                volume = int(hist_5d["Volume"].iloc[-1]) if "Volume" in hist_5d else None
+            # Volume + fallback high/low when Finnhub wasn't used
+            if high is None or low is None:
+                hist_today = ticker.history(period="1d", interval="1d")
+                if not hist_today.empty:
+                    high = high or round(float(hist_today["High"].iloc[-1]), 2)
+                    low = low or round(float(hist_today["Low"].iloc[-1]), 2)
+                    volume = int(hist_today["Volume"].iloc[-1]) if "Volume" in hist_today else None
+                elif not hist_5d.empty:
+                    high = high or round(float(hist_5d["High"].iloc[-1]), 2)
+                    low = low or round(float(hist_5d["Low"].iloc[-1]), 2)
+                    volume = int(hist_5d["Volume"].iloc[-1]) if "Volume" in hist_5d else None
+                else:
+                    high = high or current
+                    low = low or current
+                    volume = None
             else:
-                high = current
-                low = current
-                volume = None
+                # Finnhub supplied high/low; still need volume from yfinance
+                hist_today = ticker.history(period="1d", interval="1d")
+                if not hist_today.empty:
+                    volume = int(hist_today["Volume"].iloc[-1]) if "Volume" in hist_today else None
+                elif not hist_5d.empty:
+                    volume = int(hist_5d["Volume"].iloc[-1]) if "Volume" in hist_5d else None
+                else:
+                    volume = None
 
             results[ticker_sym] = {
                 "type": info["type"],
                 "tracks": info["tracks"],
                 "price": round(current, 2),
-                "change": round(change, 2),
-                "change_pct": round(change_pct, 2),
+                "change": change,
+                "change_pct": change_pct,
                 "five_day_change_pct": round(five_day_change, 2),
                 "volume": volume,
                 "high": high,
