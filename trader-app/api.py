@@ -145,15 +145,28 @@ def _run_task_in_thread(task_id: str, task_name: str, func):
 
     try:
         func()
-        entry["status"] = "completed"
+        final_status = "completed"
+        final_error = None
     except Exception as e:
         logger.error(f"Task {task_id} failed: {e}")
-        entry["status"] = "failed"
-        entry["error"] = str(e)
+        final_status = "failed"
+        final_error = str(e)
     finally:
-        entry["finished_at"] = datetime.now().isoformat()
+        finished_at = datetime.now().isoformat()
         with _task_lock:
             _running_tasks.pop(task_id, None)
+            # Re-read from disk and update the matching entry so that
+            # concurrent _sync_task_history() calls can't orphan our
+            # in-memory reference (the entry we appended above may no
+            # longer be in _task_history if _sync replaced the list).
+            global _task_history
+            _task_history = _read_task_history_from_disk()
+            for h in reversed(_task_history):
+                if h["task_id"] == task_id and h["started_at"] == start_time:
+                    h["status"] = final_status
+                    h["finished_at"] = finished_at
+                    h["error"] = final_error
+                    break
             _save_task_history()
 
 
