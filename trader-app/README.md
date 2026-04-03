@@ -4,6 +4,8 @@ A fully autonomous, simulated day-trading agent that monitors global markets, ex
 
 No real money is involved. All trades are simulated and tracked on disk.
 
+![Paper Day Trader](../images/PaperDayTrader.png)
+
 ## Architecture
 
 The project is split into two services that run together via Docker Compose:
@@ -13,7 +15,7 @@ The project is split into two services that run together via Docker Compose:
 │  trader (Python / FastAPI)                                   │
 │                                                              │
 │  ┌─────────────────────────────────────────────────────────┐ │
-│  │  APScheduler (9 scheduled jobs)                         │ │
+│  │  APScheduler (10 scheduled jobs)                        │ │
 │  │                                                         │ │
 │  │  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌───────────┐  │ │
 │  │  │ Research  │ │ Trader   │ │Sentiment │ │   Risk    │  │ │
@@ -23,10 +25,10 @@ The project is split into two services that run together via Docker Compose:
 │  │  │ Report   │ │Rebalancer│ │Performanc│ │  Events   │  │ │
 │  │  │ (7 AM)   │ │ (Mon)    │ │  (Fri)   │ │  (6 AM)   │  │ │
 │  │  └──────────┘ └──────────┘ └──────────┘ └───────────┘  │ │
-│  │  ┌──────────┐                                           │ │
-│  │  │Compaction│                                           │ │
-│  │  │ (5 AM)   │                                           │ │
-│  │  └──────────┘                                           │ │
+│  │  ┌──────────┐ ┌──────────┐                              │ │
+│  │  │Compaction│ │Expansion │                              │ │
+│  │  │ (5 AM)   │ │ (Wed)    │                              │ │
+│  │  └──────────┘ └──────────┘                              │ │
 │  └─────────────────────────────────────────────────────────┘ │
 │                                                              │
 │  ┌────────────┐  ┌───────────────┐  ┌────────────────────┐  │
@@ -51,7 +53,7 @@ The project is split into two services that run together via Docker Compose:
 - **Framework:** FastAPI + Uvicorn
 - **Scheduler:** APScheduler (background, runs inside the API process)
 - **LLM:** Ollama (self-hosted, configurable models)
-- **Market data:** yfinance
+- **Market data:** yfinance (historical + fallback prices), Finnhub `/quote` real-time quotes (ETFs, when `FINNHUB_API_KEY` is set)
 - **Technical analysis:** pandas-ta (SMA, EMA, RSI, MACD, Bollinger Bands, ATR)
 
 ### Frontend (`web` service)
@@ -62,21 +64,21 @@ The project is split into two services that run together via Docker Compose:
 
 ## Agents
 
-The system runs nine scheduled agents, each with a distinct responsibility:
+The system runs ten scheduled agents, each with a distinct responsibility:
 
 ### Core Trading Loop
 
 | Agent | Schedule | Model | Description |
 |-------|----------|-------|-------------|
-| Market Research | Every 10 min (9 AM–4 PM) | `qwen2.5:7b` | Gathers market data from 7 sources, produces structured research notes, checks stop-loss/opportunity alerts. Triggers the trader if alerts fire. |
-| Hourly Market Check | Every 30 min (9 AM–4 PM) | `deepseek-r1:14b` | Full trading cycle — reads research, sentiment, risk alerts, events, technical indicators, regime, and scoring framework, then decides to buy/sell/hold, executes trades, writes reflections. |
-| Morning Report | 7:00 AM weekdays | `phi3:3.8b` | Generates a daily summary report with portfolio state, trades, performance, and outlook. |
+| Market Research | Every 10 min (9 AM–4 PM) | `qwen3.5:latest` | Gathers market data from 7 sources, produces structured research notes, checks stop-loss/opportunity alerts. Triggers the trader if alerts fire. |
+| Market Check | Every 30 min (9 AM–4 PM) | `deepseek-r1:14b` | Full trading cycle — reads research, sentiment, risk alerts, events, technical indicators, regime, and scoring framework, then decides to buy/sell/hold, executes trades, writes reflections. |
+| Morning Report | 7:00 AM weekdays | `qwen2.5:7b` | Generates a daily summary report with portfolio state, trades, performance, and outlook. |
 
 ### Intelligence Agents
 
 | Agent | Schedule | Model | Description |
 |-------|----------|-------|-------------|
-| Sentiment Analysis | 8 AM, 12 PM, 4 PM weekdays | `qwen2.5:7b` | Scrapes news headlines via yfinance, scores each instrument as bullish/neutral/bearish with confidence levels. Writes `sentiment.md` consumed by the trader. |
+| Sentiment Analysis | 8 AM, 12 PM, 4 PM weekdays | `llama3.1:8b` | Scrapes news headlines via yfinance, scores each instrument as bullish/neutral/bearish with confidence levels. Writes `sentiment.md` consumed by the trader. |
 | Events Calendar | 6:00 AM weekdays | `qwen2.5:7b` | Fetches upcoming economic events (FOMC, jobs, CPI, earnings) and writes `events.md`. The trader uses this to avoid opening positions ahead of high-impact events. |
 
 ### Risk & Portfolio Management
@@ -84,13 +86,14 @@ The system runs nine scheduled agents, each with a distinct responsibility:
 | Agent | Schedule | Model | Description |
 |-------|----------|-------|-------------|
 | Risk Monitor | Every 3 min (9 AM–4 PM) | None (rule-based) | Watches for trailing stop breaches, take-profit targets, portfolio drawdown, volatility spikes, and position correlation. Automatically executes trailing stop and take-profit sells. Wakes the trader on critical alerts. |
-| Portfolio Rebalancer | 6:00 AM Mondays | `qwen2.5:7b` | Analyzes allocation drift, concentration risk, and cash drag. Suggests and executes rebalancing trades when positions drift beyond thresholds. |
+| Portfolio Rebalancer | 6:00 AM Mondays | `qwen3.5:latest` | Analyzes allocation drift, concentration risk, and cash drag. Suggests and executes rebalancing trades when positions drift beyond thresholds. |
 
-### Analytics & Maintenance
+### Expansion & Analytics
 
 | Agent | Schedule | Model | Description |
 |-------|----------|-------|-------------|
-| Performance Analyst | 6:00 AM Fridays | `qwen2.5:7b` | Computes win rate, profit factor, per-instrument breakdown, max drawdown, holding period analysis, and pattern detection. Generates quantitative feedback fed into the trading prompt. |
+| Expansion Analysis | 7:00 AM Wednesdays | `qwen3.5:latest` | Evaluates potential new instruments for portfolio diversification. Generates proposals that require user approval before trading. |
+| Performance Analyst | 6:00 AM Fridays | `qwen3.5:latest` | Computes win rate, profit factor, per-instrument breakdown, max drawdown, holding period analysis, and pattern detection. Generates quantitative feedback fed into the trading prompt. |
 | Memory Compaction | 5:00 AM weekdays | `phi3:3.8b` | Summarizes old entries to prevent unbounded file growth. Archives research, trades, and reflections into compressed history files. |
 
 ### Agent Data Flow
@@ -111,6 +114,7 @@ Reflections ←───────────────┘
 Performance Analyst ──→ Performance Reports ──→ Feedback Loop
 Compaction Agent    ──→ Archived History
 Rebalancer          ──→ Rebalancing Trades
+Expansion Agent     ──→ Instrument Proposals ──→ User Approval
 ```
 
 All schedules are configurable via environment variables using cron syntax.
@@ -121,9 +125,10 @@ The agent uses three separate models for different tasks, allowing you to balanc
 
 | Role | Default Model | Used By |
 |------|--------------|---------|
-| Trader | `deepseek-r1:14b` | Hourly market check (trading decisions) |
-| Research / Analysis | `qwen2.5:7b` | Research, sentiment, events, rebalancer, performance |
-| Summarization | `phi3:3.8b` | Morning report, memory compaction |
+| Trader | `deepseek-r1:14b` | Market check (trading decisions) |
+| Research / Analysis | `qwen3.5:latest` | Research, rebalancer, performance, expansion |
+| Intelligence | `llama3.1:8b` / `qwen2.5:7b` | Sentiment (`llama3.1:8b`), events (`qwen2.5:7b`), morning report (`qwen2.5:7b`) |
+| Summarization | `phi3:3.8b` | Memory compaction |
 
 The risk monitor is purely rule-based and does not call the LLM.
 
@@ -329,7 +334,9 @@ To prevent unbounded file growth, a compaction agent runs daily at 5 AM and:
 - An Ollama instance with the required models pulled:
   ```bash
   ollama pull deepseek-r1:14b
+  ollama pull qwen3.5:latest
   ollama pull qwen2.5:7b
+  ollama pull llama3.1:8b
   ollama pull phi3:3.8b
   ```
 
@@ -349,8 +356,12 @@ All configuration is done via environment variables in `docker-compose.yml` (whi
 environment:
   - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://host.docker.internal:11434}  # Your Ollama host
   - TRADER_MODEL_NAME=deepseek-r1:14b
-  - RESEARCH_MODEL=qwen2.5:7b
-  - REPORT_MODEL=phi3:3.8b
+  - RESEARCH_MODEL=qwen3.5:latest
+  - REPORT_MODEL=qwen2.5:7b
+  - SENTIMENT_MODEL=llama3.1:8b
+  - EVENTS_MODEL=qwen2.5:7b
+  - EXPANSION_MODEL=qwen3.5:latest
+  - COMPACTION_MODEL=phi3:3.8b
   - TEMPERATURE=0.3
   # Core trading loop
   - HOURLY_CRON=0,30 9-16 * * 1-5       # Every 30 min during market hours
@@ -411,6 +422,9 @@ docker compose run --rm trader rebalance
 docker compose run --rm trader performance
 docker compose run --rm trader compact
 
+# Expansion
+docker compose run --rm trader expansion
+
 # Standalone scheduler (no API)
 docker compose run --rm trader scheduler
 ```
@@ -429,6 +443,8 @@ All endpoints are prefixed with `/api`.
 | GET | `/api/market/instruments` | Live instrument prices |
 | GET | `/api/market/technicals` | Technical indicators for all instruments (SMA, EMA, RSI, MACD, BB, ATR, volume ratio, ROC) |
 | GET | `/api/market/regime` | Current market regime classification and parameters |
+| GET | `/api/market/ticker/{ticker}/history?days=30` | Price history for a single ticker |
+| GET | `/api/market/news` | Market news headlines from yfinance |
 
 ### Logs & Reports
 
@@ -453,6 +469,8 @@ All endpoints are prefixed with `/api`.
 |--------|------|-------------|
 | GET | `/api/risk-alerts?limit=20` | Risk monitor alert history (includes auto-executed stops and take-profits) |
 | GET | `/api/performance?limit=5` | Performance analysis reports |
+| GET | `/api/score-weights` | Adaptive per-instrument scoring dimension weights |
+| GET | `/api/stress-test` | Portfolio stress test results (cached 5 min) |
 
 ### Multi-Source Research
 
@@ -483,8 +501,15 @@ All endpoints are prefixed with `/api`.
 | GET | `/api/tasks/history?limit=50` | Task execution history |
 | POST | `/api/tasks/{task_id}/run` | Manually trigger a task |
 | POST | `/api/tasks/{task_id}/stop` | Request to stop a running task |
+| PUT | `/api/tasks/{task_id}/schedule` | Update a task's cron schedule |
 
 Task IDs: `research`, `hourly_check`, `morning_report`, `compaction`, `sentiment`, `risk_monitor`, `rebalancer`, `performance`, `events`, `expansion`
+
+### Chat
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/api/chat` | Send a message to the trading agent with full portfolio context |
 
 ### System
 
@@ -496,20 +521,22 @@ Task IDs: `research`, `hourly_check`, `morning_report`, `compaction`, `sentiment
 
 ## Web Dashboard
 
-The dashboard at http://localhost:3000 provides eleven views:
+The dashboard at http://localhost:3000 provides the following views:
 
-- **Dashboard** — Portfolio value, cash, return %, market regime badge, open positions with trailing stop levels, scheduled task status (auto-refreshes every 30s)
+- **Dashboard** — Portfolio value, cash, return %, market regime badge, open positions (clickable with price history chart modal), scheduled task status, index tracker bar (auto-refreshes every 30s)
 - **Trades** — Full trade log with expandable reasoning for each entry
-- **Technicals** — Technical indicators table for all instruments (SMA, RSI, MACD, ATR, Bollinger Bands, volume ratio, ROC) plus market regime classification with supporting signals
+- **Technicals** — Technical indicators table for all instruments (SMA, RSI, MACD, ATR, Bollinger Bands, volume ratio, ROC) with tooltip explanations, plus market regime classification with supporting signals
 - **Research** — Research notes rendered as markdown
 - **Expansion** — Expansion proposals with approve/reject controls
+- **News** — Market headlines from yfinance with ticker badge filters, source attribution, and relative timestamps
 - **Sentiment** — News sentiment scores and analysis per instrument
-- **Risk** — Risk monitor alert history (stop-losses, trailing stops, take-profits, drawdowns, volatility, correlation)
+- **Risk** — Risk monitor alert history (stop-losses, trailing stops, take-profits, drawdowns, volatility, correlation) with stress test panel
 - **Events** — Economic events calendar for the week ahead
-- **Performance** — Weekly quantitative performance reports with metrics
+- **Performance** — Weekly quantitative performance reports with metrics and adaptive score weights
 - **Reports** — Accordion list of daily morning reports
 - **Reflections** — Agent self-assessments rendered as markdown
 - **Tasks** — Manual task controls (run/stop) for all agents, cron schedules, and execution history (auto-refreshes every 5s)
+- **Chat** — Conversational interface for interrogating agents about their trading decisions
 
 The frontend proxies all `/api/*` requests to the backend via Next.js rewrites.
 
@@ -524,7 +551,8 @@ trader-app/
 ├── config.py              # All configuration (instruments, regime params, scoring thresholds,
 │                          #   position sizing, stop/take-profit settings, system prompt)
 ├── events_agent.py        # Economic events calendar agent
-├── market_data.py         # Market data fetching via yfinance + technical indicator computation
+├── expansion.py           # Expansion analysis agent (new instrument proposals, user approval)
+├── market_data.py         # Market data fetching via Finnhub + yfinance fallback, technical indicators
 ├── performance_analyst.py # Weekly quantitative performance agent + per-trade feedback generation
 ├── position_sizing.py     # Volatility-scaled position sizing (ATR-based, regime-adjusted)
 ├── rebalancer.py          # Weekly portfolio rebalancing agent
@@ -532,8 +560,10 @@ trader-app/
 ├── risk_monitor.py        # High-frequency risk monitoring with automatic trailing stop
 │                          #   and take-profit execution
 ├── scheduler.py           # APScheduler setup (background + standalone modes)
+├── score_weights.py       # Adaptive per-instrument scoring dimension weights
 ├── sentiment_agent.py     # News sentiment analysis agent
 ├── server.py              # FastAPI app with scheduler lifespan
+├── stress_test.py         # Portfolio stress testing (scenario analysis)
 ├── entrypoint.sh          # Docker entrypoint (Ollama health check, command routing)
 ├── Dockerfile             # Python backend container
 ├── docker-compose.yml     # Multi-service orchestration
@@ -558,6 +588,10 @@ trader-app/
 ├── trader/                # Persistent data (volume-mounted)
 │   ├── portfolio.json     # Portfolio state with trailing stops
 │   ├── regime.json        # Current market regime
+│   ├── approved_instruments.json
+│   ├── expansion_proposals.json
+│   ├── portfolio_history.json
+│   ├── task_history.json
 │   ├── trade_log.md
 │   ├── reflections.md
 │   ├── research.md
