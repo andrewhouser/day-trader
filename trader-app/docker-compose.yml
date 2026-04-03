@@ -6,8 +6,12 @@ services:
     environment:
       - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
       - TRADER_MODEL_NAME=deepseek-r1:14b
-      - RESEARCH_MODEL=qwen2.5:7b
-      - REPORT_MODEL=phi3:3.8b
+      - RESEARCH_MODEL=qwen3.5:latest
+      - REPORT_MODEL=qwen2.5:7b
+      - SENTIMENT_MODEL=llama3.1:8b
+      - EVENTS_MODEL=qwen3.5:latest
+      - EXPANSION_MODEL=qwen3.5:latest
+      - COMPACTION_MODEL=phi3:3.8b
       - TEMPERATURE=0.3
       - HOURLY_CRON=0,30 9-16 * * 1-5
       - MORNING_REPORT_CRON=0 7 * * 1-5

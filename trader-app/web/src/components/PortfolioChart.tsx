@@ -29,6 +29,19 @@ function formatTick(iso: string, days: number) {
   return d.toLocaleDateString([], { month: "short", year: "2-digit" });
 }
 
+function describeSpan(data: PortfolioSnapshot[]): string {
+  if (data.length === 0) return "";
+  const first = new Date(data[0].timestamp);
+  const last = new Date(data[data.length - 1].timestamp);
+  const diffMs = last.getTime() - first.getTime();
+  const diffMins = Math.round(diffMs / 60000);
+  if (diffMins < 60) return `${diffMins}m of data`;
+  const diffHours = Math.round(diffMins / 60);
+  if (diffHours < 24) return `${diffHours}h of data`;
+  const diffDays = Math.round(diffHours / 24);
+  return `${diffDays}d of data`;
+}
+
 export default function PortfolioChart() {
   const [range, setRange] = useState(30);
   const [data, setData] = useState<PortfolioSnapshot[]>([]);
@@ -45,10 +58,27 @@ export default function PortfolioChart() {
     Cash: s.cash_usd,
   }));
 
+  const selectedLabel = RANGES.find((r) => r.days === range)?.label ?? "";
+  const spanText = describeSpan(data);
+  const dataSpanInsufficient =
+    data.length > 0 && (() => {
+      const first = new Date(data[0].timestamp);
+      const last = new Date(data[data.length - 1].timestamp);
+      const spanDays = (last.getTime() - first.getTime()) / 86400000;
+      return spanDays < range * 0.5;
+    })();
+
   return (
     <div className="card">
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.75rem" }}>
-        <div className="section-title" style={{ margin: 0 }}>Portfolio History</div>
+        <div style={{ display: "flex", alignItems: "baseline", gap: "0.5rem" }}>
+          <div className="section-title" style={{ margin: 0 }}>Portfolio History</div>
+          {!loading && data.length > 0 && dataSpanInsufficient && (
+            <span style={{ fontSize: "0.75rem", color: "var(--yellow)" }}>
+              ({spanText} available for {selectedLabel} view)
+            </span>
+          )}
+        </div>
         <div style={{ display: "flex", gap: "0.35rem" }}>
           {RANGES.map((r) => (
             <button
@@ -69,7 +99,7 @@ export default function PortfolioChart() {
         </div>
       ) : chartData.length === 0 ? (
         <div className="empty-state" style={{ height: 260 }}>
-          No history data for this range yet. Data is recorded each time the agent trades.
+          No history data for the {selectedLabel} range. Data is recorded each time the agent runs.
         </div>
       ) : (
         <ResponsiveContainer width="100%" height={280}>
@@ -121,6 +151,12 @@ export default function PortfolioChart() {
             />
           </AreaChart>
         </ResponsiveContainer>
+      )}
+
+      {!loading && data.length > 0 && (
+        <div style={{ fontSize: "0.7rem", color: "var(--text-muted)", textAlign: "right", marginTop: "0.35rem" }}>
+          {data.length} data point{data.length !== 1 ? "s" : ""}
+        </div>
       )}
     </div>
   );

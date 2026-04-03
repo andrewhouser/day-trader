@@ -3,9 +3,13 @@ import os
 
 # Ollama settings
 OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://host.docker.internal:11434")
-TRADER_MODEL_NAME = os.getenv("TRADER_MODEL_NAME", "deepseek-r1:14b")  # Trading agent (reasoning)
-RESEARCH_MODEL = os.getenv("RESEARCH_MODEL", "qwen2.5:7b")  # Research agent (analysis/summarization)
-REPORT_MODEL = os.getenv("REPORT_MODEL", "phi3:3.8b")  # Morning report (formatting/summarization)
+TRADER_MODEL_NAME = os.getenv("TRADER_MODEL_NAME", "deepseek-r1:14b")  # Trading agent (complex reasoning, trade decisions)
+RESEARCH_MODEL = os.getenv("RESEARCH_MODEL", "qwen3.5:latest")  # Research, summarizer, performance, rebalancer (analysis/long context)
+REPORT_MODEL = os.getenv("REPORT_MODEL", "qwen2.5:7b")  # Morning report (formatting/summarization)
+SENTIMENT_MODEL = os.getenv("SENTIMENT_MODEL", "llama3.1:8b")  # Sentiment agent (classification)
+EVENTS_MODEL = os.getenv("EVENTS_MODEL", "qwen3.5:latest")  # Events calendar (structured generation)
+EXPANSION_MODEL = os.getenv("EXPANSION_MODEL", "qwen3.5:latest")  # Expansion analysis (portfolio analysis)
+COMPACTION_MODEL = os.getenv("COMPACTION_MODEL", "phi3:3.8b")  # Compaction (lightweight summarization)
 TEMPERATURE = float(os.getenv("TEMPERATURE", "0.3"))
 
 # Scheduling (cron-style, all times in TIMEZONE)
@@ -150,7 +154,6 @@ SCORE_SELL_THRESHOLD = int(os.getenv("SCORE_SELL_THRESHOLD", "-3"))
 
 # Compaction settings
 COMPACTION_CRON = os.getenv("COMPACTION_CRON", "0 5 * * 1-5")  # 5:00 AM weekdays (before morning report)
-COMPACTION_MODEL = os.getenv("COMPACTION_MODEL", "phi3:3.8b")  # Lightweight model for summarization
 RESEARCH_KEEP_ENTRIES = int(os.getenv("RESEARCH_KEEP_ENTRIES", "3"))  # Keep last N research entries after compaction
 TRADE_LOG_RETENTION_DAYS = int(os.getenv("TRADE_LOG_RETENTION_DAYS", "30"))  # Keep raw trades for N days
 REFLECTIONS_RETENTION_DAYS = int(os.getenv("REFLECTIONS_RETENTION_DAYS", "14"))  # Keep raw reflections for N days
@@ -163,9 +166,6 @@ OPPORTUNITY_PCT = float(os.getenv("OPPORTUNITY_PCT", "2.0"))    # Trigger trade 
 RISK_VOLATILITY_THRESHOLD = float(os.getenv("RISK_VOLATILITY_THRESHOLD", "2.5"))  # % intraday swing to flag
 RISK_CORRELATION_THRESHOLD = float(os.getenv("RISK_CORRELATION_THRESHOLD", "0.85"))  # Correlation threshold for concentration warning
 RISK_MAX_DRAWDOWN_PCT = float(os.getenv("RISK_MAX_DRAWDOWN_PCT", "5.0"))  # Portfolio drawdown % to trigger alert
-
-# Sentiment model
-SENTIMENT_MODEL = os.getenv("SENTIMENT_MODEL", "qwen2.5:7b")
 
 # Rebalancer settings
 REBALANCER_TARGET_CASH_PCT = float(os.getenv("REBALANCER_TARGET_CASH_PCT", "20.0"))  # Target cash allocation %

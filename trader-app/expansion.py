@@ -270,7 +270,7 @@ Consider the portfolio's current ETF-heavy composition and suggest instruments
 that complement rather than duplicate existing exposure."""
 
     logger.info("Sending expansion analysis prompt to LLM...")
-    response = call_ollama(prompt, system=EXPANSION_SYSTEM, model=config.RESEARCH_MODEL)
+    response = call_ollama(prompt, system=EXPANSION_SYSTEM, model=config.EXPANSION_MODEL)
     logger.info(f"Expansion analysis received ({len(response)} chars)")
 
     # Parse proposals from the response

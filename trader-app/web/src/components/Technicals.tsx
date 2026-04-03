@@ -22,12 +22,18 @@ export default function Technicals() {
 
   async function load() {
     try {
-      const [t, r] = await Promise.all([api.getTechnicals(), api.getRegime()]);
+      const t = await api.getTechnicals();
       setTechnicals(t);
-      setRegime(r);
       setError("");
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Failed to load");
+    }
+    // Regime is non-critical — don't let it block the page
+    try {
+      const r = await api.getRegime();
+      setRegime(r);
+    } catch {
+      setRegime(null);
     }
   }
 

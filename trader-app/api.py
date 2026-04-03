@@ -134,6 +134,7 @@ def get_portfolio():
 @app.get("/api/portfolio/history")
 def get_portfolio_history(days: int = 30):
     """Return portfolio value history, optionally filtered to last N days."""
+    from datetime import timedelta, timezone
     try:
         with open(config.PORTFOLIO_HISTORY_PATH, "r") as f:
             history = json.load(f)
@@ -141,12 +142,17 @@ def get_portfolio_history(days: int = 30):
         history = []
 
     if days and history:
-        from datetime import timedelta
-        cutoff = datetime.now() - timedelta(days=days)
-        history = [
-            s for s in history
-            if datetime.fromisoformat(s["timestamp"]) >= cutoff
-        ]
+        now = datetime.now(timezone.utc)
+        cutoff = now - timedelta(days=days)
+        filtered = []
+        for s in history:
+            ts = datetime.fromisoformat(s["timestamp"])
+            # Treat naive timestamps as UTC for consistent comparison
+            if ts.tzinfo is None:
+                ts = ts.replace(tzinfo=timezone.utc)
+            if ts >= cutoff:
+                filtered.append(s)
+        history = filtered
 
     return history
 
@@ -462,6 +468,9 @@ def get_config_updated():
         "research_model": config.RESEARCH_MODEL,
         "report_model": config.REPORT_MODEL,
         "sentiment_model": config.SENTIMENT_MODEL,
+        "events_model": config.EVENTS_MODEL,
+        "expansion_model": config.EXPANSION_MODEL,
+        "compaction_model": config.COMPACTION_MODEL,
         "ollama_url": config.OLLAMA_BASE_URL,
         "temperature": config.TEMPERATURE,
         "timezone": config.TIMEZONE,
