@@ -11,20 +11,62 @@ import config
 logger = logging.getLogger(__name__)
 
 
+def _get_live_price(ticker: yf.Ticker, ticker_sym: str) -> tuple[float | None, str]:
+    """Try to get the most current price using a three-level fallback.
+    Returns (price, source) where source is 'live', 'intraday', or 'daily_close'."""
+    # Level 1: fast_info (real-time quote)
+    try:
+        price = ticker.fast_info.get("last_price") or ticker.fast_info.get("lastPrice")
+        if price and price > 0:
+            logger.debug(f"{ticker_sym}: live price ${price:.2f} via fast_info")
+            return round(float(price), 2), "live"
+    except Exception:
+        pass
+
+    # Level 2: latest 1-minute bar
+    try:
+        hist_1m = ticker.history(period="1d", interval="1m")
+        if not hist_1m.empty:
+            price = float(hist_1m["Close"].iloc[-1])
+            logger.debug(f"{ticker_sym}: intraday price ${price:.2f} via 1m bar")
+            return round(price, 2), "intraday"
+    except Exception:
+        pass
+
+    # Level 3: daily close fallback
+    try:
+        hist_d = ticker.history(period="5d")
+        if not hist_d.empty:
+            price = float(hist_d["Close"].iloc[-1])
+            logger.debug(f"{ticker_sym}: daily close ${price:.2f} via 5d history")
+            return round(price, 2), "daily_close"
+    except Exception:
+        pass
+
+    return None, "unavailable"
+
+
 def fetch_index_levels() -> dict:
     """Fetch current levels for all tracked indices."""
     results = {}
     for symbol, name in config.INDICES.items():
         try:
             ticker = yf.Ticker(symbol)
-            hist = ticker.history(period="2d")
-            if hist.empty:
-                logger.warning(f"No data for {symbol} ({name})")
-                results[name] = {"symbol": symbol, "error": "No data available"}
-                continue
 
-            current = hist["Close"].iloc[-1]
-            prev = hist["Close"].iloc[-2] if len(hist) > 1 else current
+            # Get live price via fallback chain
+            current, price_source = _get_live_price(ticker, symbol)
+
+            # Get prior daily close for change calculation
+            hist = ticker.history(period="2d")
+            if current is None:
+                if hist.empty:
+                    logger.warning(f"No data for {symbol} ({name})")
+                    results[name] = {"symbol": symbol, "error": "No data available"}
+                    continue
+                current = round(float(hist["Close"].iloc[-1]), 2)
+                price_source = "daily_close"
+
+            prev = float(hist["Close"].iloc[-2]) if len(hist) > 1 else current
             change = current - prev
             change_pct = (change / prev) * 100 if prev else 0
 
@@ -33,7 +75,8 @@ def fetch_index_levels() -> dict:
                 "price": round(current, 2),
                 "change": round(change, 2),
                 "change_pct": round(change_pct, 2),
-                "timestamp": hist.index[-1].isoformat(),
+                "price_source": price_source,
+                "timestamp": hist.index[-1].isoformat() if not hist.empty else datetime.now().isoformat(),
             }
         except Exception as e:
             logger.error(f"Error fetching {symbol}: {e}")
@@ -47,21 +90,43 @@ def fetch_instrument_prices() -> dict:
     for ticker_sym, info in config.INSTRUMENTS.items():
         try:
             ticker = yf.Ticker(ticker_sym)
-            hist = ticker.history(period="5d")
-            if hist.empty:
-                results[ticker_sym] = {"error": "No data available"}
-                continue
 
-            current = hist["Close"].iloc[-1]
-            prev = hist["Close"].iloc[-2] if len(hist) > 1 else current
+            # Get live price via fallback chain
+            current, price_source = _get_live_price(ticker, ticker_sym)
+
+            # Get 5d daily history for change and momentum calculations
+            hist_5d = ticker.history(period="5d")
+            if current is None:
+                if hist_5d.empty:
+                    results[ticker_sym] = {"error": "No data available"}
+                    continue
+                current = round(float(hist_5d["Close"].iloc[-1]), 2)
+                price_source = "daily_close"
+
+            prev = float(hist_5d["Close"].iloc[-2]) if len(hist_5d) > 1 else current
             change = current - prev
             change_pct = (change / prev) * 100 if prev else 0
 
-            # Simple momentum: 5-day trend
-            if len(hist) >= 5:
-                five_day_change = ((current - hist["Close"].iloc[0]) / hist["Close"].iloc[0]) * 100
+            # 5-day momentum from daily bars
+            if len(hist_5d) >= 5:
+                five_day_change = ((current - float(hist_5d["Close"].iloc[0])) / float(hist_5d["Close"].iloc[0])) * 100
             else:
                 five_day_change = 0
+
+            # Today's session high/low from daily bar (not 1m bars)
+            hist_today = ticker.history(period="1d", interval="1d")
+            if not hist_today.empty:
+                high = round(float(hist_today["High"].iloc[-1]), 2)
+                low = round(float(hist_today["Low"].iloc[-1]), 2)
+                volume = int(hist_today["Volume"].iloc[-1]) if "Volume" in hist_today else None
+            elif not hist_5d.empty:
+                high = round(float(hist_5d["High"].iloc[-1]), 2)
+                low = round(float(hist_5d["Low"].iloc[-1]), 2)
+                volume = int(hist_5d["Volume"].iloc[-1]) if "Volume" in hist_5d else None
+            else:
+                high = current
+                low = current
+                volume = None
 
             results[ticker_sym] = {
                 "type": info["type"],
@@ -70,10 +135,11 @@ def fetch_instrument_prices() -> dict:
                 "change": round(change, 2),
                 "change_pct": round(change_pct, 2),
                 "five_day_change_pct": round(five_day_change, 2),
-                "volume": int(hist["Volume"].iloc[-1]) if "Volume" in hist else None,
-                "high": round(hist["High"].iloc[-1], 2),
-                "low": round(hist["Low"].iloc[-1], 2),
-                "timestamp": hist.index[-1].isoformat(),
+                "volume": volume,
+                "high": high,
+                "low": low,
+                "price_source": price_source,
+                "timestamp": datetime.now().isoformat(),
             }
         except Exception as e:
             logger.error(f"Error fetching {ticker_sym}: {e}")
@@ -95,7 +161,8 @@ def get_market_summary() -> str:
             direction = "▲" if data["change"] >= 0 else "▼"
             lines.append(
                 f"- {name} ({data['symbol']}): {data['price']} "
-                f"{direction} {data['change']} ({data['change_pct']:+.2f}%)"
+                f"{direction} {data['change']} ({data['change_pct']:+.2f}%) "
+                f"[{data.get('price_source', 'unknown')}]"
             )
 
     lines.append("\n### Tradeable Instruments\n")
@@ -109,7 +176,8 @@ def get_market_summary() -> str:
                 f"{direction} {data['change']} ({data['change_pct']:+.2f}%) | "
                 f"5d: {data['five_day_change_pct']:+.2f}% | "
                 f"Vol: {data.get('volume', 'N/A')} | "
-                f"H: ${data['high']} L: ${data['low']}"
+                f"H: ${data['high']} L: ${data['low']} "
+                f"[{data.get('price_source', 'unknown')}]"
             )
 
     return "\n".join(lines)
@@ -144,7 +212,6 @@ def fetch_technical_indicators() -> dict:
             indicators = {}
 
             if ta is not None:
-                # SMAs
                 sma20 = ta.sma(close, length=20)
                 sma50 = ta.sma(close, length=50)
                 sma200 = ta.sma(close, length=200)
@@ -152,17 +219,14 @@ def fetch_technical_indicators() -> dict:
                 indicators["sma_50"] = round(float(sma50.iloc[-1]), 2) if sma50 is not None and not sma50.empty and pd.notna(sma50.iloc[-1]) else None
                 indicators["sma_200"] = round(float(sma200.iloc[-1]), 2) if sma200 is not None and not sma200.empty and pd.notna(sma200.iloc[-1]) else None
 
-                # EMAs
                 ema12 = ta.ema(close, length=12)
                 ema26 = ta.ema(close, length=26)
                 indicators["ema_12"] = round(float(ema12.iloc[-1]), 2) if ema12 is not None and not ema12.empty and pd.notna(ema12.iloc[-1]) else None
                 indicators["ema_26"] = round(float(ema26.iloc[-1]), 2) if ema26 is not None and not ema26.empty and pd.notna(ema26.iloc[-1]) else None
 
-                # RSI
                 rsi = ta.rsi(close, length=14)
                 indicators["rsi_14"] = round(float(rsi.iloc[-1]), 2) if rsi is not None and not rsi.empty and pd.notna(rsi.iloc[-1]) else None
 
-                # MACD
                 macd_df = ta.macd(close, fast=12, slow=26, signal=9)
                 if macd_df is not None and not macd_df.empty:
                     cols = macd_df.columns
@@ -170,7 +234,6 @@ def fetch_technical_indicators() -> dict:
                     indicators["macd_signal"] = round(float(macd_df[cols[1]].iloc[-1]), 4) if pd.notna(macd_df[cols[1]].iloc[-1]) else None
                     indicators["macd_histogram"] = round(float(macd_df[cols[2]].iloc[-1]), 4) if pd.notna(macd_df[cols[2]].iloc[-1]) else None
 
-                # Bollinger Bands
                 bb = ta.bbands(close, length=20, std=2)
                 if bb is not None and not bb.empty:
                     bb_cols = bb.columns
@@ -178,18 +241,15 @@ def fetch_technical_indicators() -> dict:
                     indicators["bb_mid"] = round(float(bb[bb_cols[1]].iloc[-1]), 2) if pd.notna(bb[bb_cols[1]].iloc[-1]) else None
                     indicators["bb_upper"] = round(float(bb[bb_cols[2]].iloc[-1]), 2) if pd.notna(bb[bb_cols[2]].iloc[-1]) else None
 
-                # ATR
                 atr = ta.atr(high, low, close, length=14)
                 indicators["atr_14"] = round(float(atr.iloc[-1]), 4) if atr is not None and not atr.empty and pd.notna(atr.iloc[-1]) else None
             else:
-                # Manual fallback calculations
                 indicators["sma_20"] = round(float(close.rolling(20).mean().iloc[-1]), 2) if len(close) >= 20 else None
                 indicators["sma_50"] = round(float(close.rolling(50).mean().iloc[-1]), 2) if len(close) >= 50 else None
                 indicators["sma_200"] = round(float(close.rolling(200).mean().iloc[-1]), 2) if len(close) >= 200 else None
                 indicators["ema_12"] = round(float(close.ewm(span=12).mean().iloc[-1]), 2)
                 indicators["ema_26"] = round(float(close.ewm(span=26).mean().iloc[-1]), 2)
 
-                # Manual RSI
                 delta = close.diff()
                 gain = delta.where(delta > 0, 0).rolling(14).mean()
                 loss = (-delta.where(delta < 0, 0)).rolling(14).mean()
@@ -197,7 +257,6 @@ def fetch_technical_indicators() -> dict:
                 rsi_series = 100 - (100 / (1 + rs))
                 indicators["rsi_14"] = round(float(rsi_series.iloc[-1]), 2) if pd.notna(rsi_series.iloc[-1]) else None
 
-                # Manual MACD
                 ema12_s = close.ewm(span=12).mean()
                 ema26_s = close.ewm(span=26).mean()
                 macd_line = ema12_s - ema26_s
@@ -206,7 +265,6 @@ def fetch_technical_indicators() -> dict:
                 indicators["macd_signal"] = round(float(signal_line.iloc[-1]), 4)
                 indicators["macd_histogram"] = round(float((macd_line - signal_line).iloc[-1]), 4)
 
-                # Manual Bollinger Bands
                 sma20_s = close.rolling(20).mean()
                 std20 = close.rolling(20).std()
                 if len(close) >= 20:
@@ -214,7 +272,6 @@ def fetch_technical_indicators() -> dict:
                     indicators["bb_mid"] = round(float(sma20_s.iloc[-1]), 2)
                     indicators["bb_upper"] = round(float((sma20_s + 2 * std20).iloc[-1]), 2)
 
-                # Manual ATR
                 if len(hist) >= 15:
                     tr1 = high - low
                     tr2 = (high - close.shift()).abs()
@@ -223,17 +280,15 @@ def fetch_technical_indicators() -> dict:
                     atr_val = tr.rolling(14).mean().iloc[-1]
                     indicators["atr_14"] = round(float(atr_val), 4) if pd.notna(atr_val) else None
 
-            # Volume ratio (current volume / 20-day average)
+            # Volume ratio
             if len(volume) >= 20 and volume.iloc[-1] > 0:
                 avg_vol = volume.rolling(20).mean().iloc[-1]
                 indicators["volume_ratio"] = round(float(volume.iloc[-1] / avg_vol), 2) if avg_vol > 0 else None
             else:
                 indicators["volume_ratio"] = None
 
-            # Current price for reference
             indicators["price"] = round(float(close.iloc[-1]), 2)
 
-            # 20-day rate of change
             if len(close) >= 20:
                 roc = ((close.iloc[-1] - close.iloc[-20]) / close.iloc[-20]) * 100
                 indicators["roc_20"] = round(float(roc), 2)
@@ -271,7 +326,6 @@ def get_technicals_summary() -> str:
         vol_ratio = data.get("volume_ratio", "N/A")
         roc = data.get("roc_20", "N/A")
 
-        # Determine trend alignment
         trend = "N/A"
         if all(v is not None for v in [data.get("sma_20"), data.get("sma_50"), data.get("sma_200")]):
             if data["sma_20"] > data["sma_50"] > data["sma_200"]:

@@ -107,7 +107,7 @@ def _tracked(task_id: str, task_name: str, func):
 
 JOBS = [
     ("research", "Market Research", run_research, "RESEARCH_CRON", 300),
-    ("hourly_check", "Hourly Market Check", run_hourly_check, "HOURLY_CRON", 300),
+    ("hourly_check", "Market Check", run_hourly_check, "HOURLY_CRON", 300),
     ("morning_report", "Morning Report", run_morning_report, "MORNING_REPORT_CRON", 600),
     ("compaction", "Memory Compaction", run_compaction, "COMPACTION_CRON", 600),
     ("sentiment", "Sentiment Analysis", run_sentiment, "SENTIMENT_CRON", 300),

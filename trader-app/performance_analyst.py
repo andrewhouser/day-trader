@@ -61,6 +61,12 @@ def _parse_all_trades() -> list[dict]:
                     trade["realized_pnl"] = float(pnl_str)
                 except ValueError:
                     pass
+            elif line.startswith("**Entry Scores:**"):
+                scores_str = line.replace("**Entry Scores:**", "").strip()
+                try:
+                    trade["entry_scores"] = json.loads(scores_str)
+                except (json.JSONDecodeError, ValueError):
+                    pass
 
         if trade.get("action") in ("BUY", "SELL"):
             trades.append(trade)
@@ -326,6 +332,25 @@ Be quantitative. Use the actual numbers. Don't be vague."""
         f.write(response)
 
     logger.info(f"Performance report saved to {report_path}")
+
+    # Update adaptive score weights from closed trades with entry_scores
+    try:
+        from score_weights import update_weights_from_outcome
+        weight_updates = 0
+        for t in trades:
+            if t.get("action") != "SELL" or "realized_pnl" not in t:
+                continue
+            # Parse entry_scores from the trade log if present
+            inst = t.get("instrument", "Unknown").split("(")[0].strip()
+            entry_scores = t.get("entry_scores")
+            if entry_scores:
+                update_weights_from_outcome(inst, entry_scores, t["realized_pnl"])
+                weight_updates += 1
+        if weight_updates:
+            logger.info(f"Updated score weights from {weight_updates} closed trade(s)")
+    except Exception as e:
+        logger.warning(f"Score weight update failed: {e}")
+
     return response
 
 

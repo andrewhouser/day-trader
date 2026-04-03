@@ -147,6 +147,50 @@ export interface ExpansionProposal {
   rejection_reason: string | null;
 }
 
+export interface TickerSnapshot {
+  time: string;
+  price: number;
+  high: number;
+  low: number;
+  volume: number | null;
+}
+
+export interface ScoreWeightsResult {
+  weights: Record<string, Record<string, number>>;
+  defaults: Record<string, number>;
+}
+
+export interface StressScenario {
+  name: string;
+  description: string;
+  shocked_value: number;
+  pct_change: number;
+  positions_stopped_out: Array<{ ticker: string; stop_type: string; estimated_loss: number }>;
+  positions_oversized?: Array<{ ticker: string; current_pct: number }>;
+  forced_reduction_cost?: number;
+  summary: string;
+}
+
+export interface StressTestResult {
+  scenarios: StressScenario[];
+  current_portfolio_value: number;
+  timestamp: string;
+}
+
+export interface NewsArticle {
+  title: string;
+  url: string;
+  source: string;
+  published: string;
+  tickers: string[];
+  related_query: string;
+}
+
+export interface NewsResult {
+  articles: NewsArticle[];
+  timestamp: string;
+}
+
 export const api = {
   getPortfolio: () => fetchJson<Portfolio>("/portfolio"),
   getPortfolioHistory: (days = 30) =>
@@ -160,6 +204,8 @@ export const api = {
     signals: Record<string, unknown>;
     parameters: Record<string, unknown>;
   }>("/market/regime"),
+  getTickerHistory: (ticker: string, days = 30) =>
+    fetchJson<TickerSnapshot[]>(`/market/history/${ticker}?days=${days}`),
   getTrades: (limit = 50) => fetchJson<TradeEntry[]>(`/trades?limit=${limit}`),
   getReflections: (limit = 20) =>
     fetchJson<{ raw: string }[]>(`/reflections?limit=${limit}`),
@@ -183,6 +229,9 @@ export const api = {
     fetchJson<{ raw: string }[]>(`/risk-alerts?limit=${limit}`),
   getPerformance: (limit = 5) =>
     fetchJson<{ raw: string }[]>(`/performance?limit=${limit}`),
+  getScoreWeights: () => fetchJson<ScoreWeightsResult>("/score-weights"),
+  getStressTest: () => fetchJson<StressTestResult>("/stress-test"),
+  getNews: () => fetchJson<NewsResult>("/news"),
   getEvents: () => fetchJson<{ content: string }>("/events"),
   // Expansion proposals
   getProposals: (status = "") =>

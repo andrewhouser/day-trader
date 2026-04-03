@@ -148,6 +148,7 @@ tr:hover td { background: var(--bg-card-hover); }
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--bg-card);
+  margin-bottom: 1rem;
 }
 .index-item {
   display: flex;

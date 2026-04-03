@@ -255,6 +255,11 @@ def execute_trade(trade: dict, portfolio: dict, technicals: dict | None = None) 
     portfolio["all_time_low"] = min(portfolio["all_time_low"], portfolio["total_value_usd"])
 
     # Log the trade
+    entry_scores = trade.get("entry_scores")
+    scores_line = ""
+    if entry_scores:
+        scores_line = f"- **Entry Scores:** {json.dumps(entry_scores)}\n"
+
     log_entry = f"""
 ## {action} - {ticker}
 - **Date:** {now.strftime('%Y-%m-%d %H:%M:%S')}
@@ -263,8 +268,7 @@ def execute_trade(trade: dict, portfolio: dict, technicals: dict | None = None) 
 - **Quantity:** {quantity}
 - **Price:** ${price}
 - **Total:** ${quantity * price:.2f}
-{f'- **Realized P&L:** ${trade.get("realized_pnl", 0):.2f}' if action == 'SELL' else ''}
-- **Reasoning:** {reasoning}
+{f'- **Realized P&L:** ${trade.get("realized_pnl", 0):.2f}' if action == 'SELL' else ''}{scores_line}- **Reasoning:** {reasoning}
 - **Portfolio Balance:** ${portfolio['total_value_usd']:.2f}
 
 ---
@@ -525,8 +529,16 @@ The following conditions were detected during research and triggered an immediat
 
 
 def run_hourly_check():
-    """Execute the hourly market check and trading cycle."""
-    logger.info("Starting hourly market check...")
+    """Execute the market check and trading cycle."""
+
+    def _get_weights_for_prompt() -> str:
+        try:
+            from score_weights import get_weights_summary
+            return get_weights_summary()
+        except Exception:
+            return "No learned weights yet — all dimensions weighted equally at 1.0."
+
+    logger.info("Starting market check...")
 
     # 1. Fetch market data and compute technicals
     market_summary = get_market_summary()
@@ -582,7 +594,7 @@ def run_hourly_check():
             f"partial_tp_hit={pos.get('take_profit_partial_hit', False)}\n"
         )
 
-    prompt = f"""Hourly Market Check
+    prompt = f"""Market Check
 
 {market_summary}
 
@@ -691,6 +703,15 @@ INSTRUCTIONS:
 13. You may output multiple trade JSON blocks if you want to make multiple trades.
 14. After your trading decision, write a brief reflection on this analysis cycle.
 
+### Score Dimension Weights (learned from trade history)
+These weights reflect which dimensions have historically predicted outcomes for each instrument.
+Apply them by multiplying each raw score by its weight before summing the composite.
+
+{_get_weights_for_prompt()}
+
+IMPORTANT: You must still output raw integer scores (-2 to +2) for each dimension in your JSON.
+The weighted composite is computed by the system — output raw scores only.
+
 Remember: Max position size is regime-adjusted to {regime_params.get('max_position_pct', 0.25) * 100:.0f}% currently. You have ${portfolio['cash_usd']:.2f} in cash and ${portfolio['total_value_usd']:.2f} total portfolio value."""
 
     # 7. Get LLM decision
@@ -698,12 +719,29 @@ Remember: Max position size is regime-adjusted to {regime_params.get('max_positi
     response = call_ollama(prompt)
     logger.info(f"LLM response received ({len(response)} chars)")
 
+    # 7.5. Extract scores from LLM response for trade attribution
+    scores_by_ticker = {}
+    json_pattern = r'```json\s*(.*?)\s*```'
+    for match in re.findall(json_pattern, response, re.DOTALL):
+        try:
+            data = json.loads(match)
+            if isinstance(data, dict) and "scores" in data:
+                scores_by_ticker = data["scores"]
+                break
+        except json.JSONDecodeError:
+            continue
+
     # 8. Parse and execute trades
     trades = parse_trades_from_response(response, portfolio)
     closed_trades = []
 
     if trades:
         for trade in trades:
+            # Attach entry scores if available for this ticker
+            ticker = trade.get("ticker", "")
+            if ticker in scores_by_ticker:
+                trade["entry_scores"] = scores_by_ticker[ticker]
+
             valid, reason = validate_trade(trade, portfolio)
             if valid:
                 logger.info(
@@ -755,7 +793,7 @@ Keep it to 3-5 sentences."""
         )
         logger.info(f"Reflection written for closed {trade['ticker']} position")
 
-    # 10. Write a general hourly reflection
+    # 10. Write a cycle reflection
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     action_summary = (
         f"Executed {len(trades)} trade(s)" if trades
@@ -776,14 +814,14 @@ Focus on: What did you observe? Was there anything surprising? What will you wat
     hourly_reflection = call_ollama(reflection_prompt)
     append_to_file(
         config.REFLECTIONS_PATH,
-        f"\n## Hourly Reflection - {now}\n"
+        f"\n## Market Check Reflection - {now}\n"
         f"**Action:** {action_summary}\n"
         f"**Regime:** {regime_data.get('regime', 'UNKNOWN')}\n\n"
         f"{hourly_reflection}\n\n---\n",
     )
-    logger.info("Hourly reflection written")
+    logger.info("Market check reflection written")
 
-    logger.info("Hourly check complete")
+    logger.info("Market check complete")
 
 
 def run_morning_report():

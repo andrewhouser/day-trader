@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { api, Portfolio, TaskInfo } from "@/lib/api";
+import { api, Portfolio, TaskInfo, Position } from "@/lib/api";
 import { cronToHuman } from "@/lib/cron";
 import PortfolioChart from "./PortfolioChart";
+import PositionChart from "./PositionChart";
 
 export default function Dashboard() {
   const [portfolio, setPortfolio] = useState<Portfolio | null>(null);
@@ -11,6 +12,7 @@ export default function Dashboard() {
   const [regime, setRegime] = useState<{ regime: string; parameters: Record<string, unknown> } | null>(null);
   const [error, setError] = useState("");
   const [lastFetched, setLastFetched] = useState<Date | null>(null);
+  const [selectedPosition, setSelectedPosition] = useState<Position | null>(null);
 
   useEffect(() => {
     load();
@@ -123,7 +125,7 @@ export default function Dashboard() {
             </thead>
             <tbody>
               {portfolio.positions.map((pos) => (
-                <tr key={pos.ticker}>
+                <tr key={pos.ticker} onClick={() => setSelectedPosition(pos)} style={{ cursor: "pointer" }}>
                   <td style={{ fontWeight: 600 }}>{pos.ticker}</td>
                   <td><span className="badge badge-blue">{pos.instrument_type}</span></td>
                   <td>{pos.quantity}</td>
@@ -196,6 +198,15 @@ export default function Dashboard() {
       <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", textAlign: "center" }}>
         Last updated: {lastFetched ? lastFetched.toLocaleString() : "—"} · Auto-refreshes every 30s
       </div>
+
+      {selectedPosition && (
+        <PositionChart
+          ticker={selectedPosition.ticker}
+          entryPrice={selectedPosition.entry_price}
+          trailingStop={selectedPosition.trailing_stop}
+          onClose={() => setSelectedPosition(null)}
+        />
+      )}
     </div>
   );
 }

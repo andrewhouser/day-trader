@@ -220,6 +220,111 @@ def get_regime():
     return load_regime()
 
 
+@app.get("/api/market/history/{ticker}")
+def get_ticker_history(ticker: str, days: int = 30):
+    """Return historical price data for a single ticker."""
+    import yfinance as yf
+    from datetime import timedelta
+
+    interval_map = {1: "5m", 7: "15m", 30: "1d", 90: "1d", 180: "1d", 365: "1wk"}
+    interval = interval_map.get(days, "1d")
+
+    end = datetime.now()
+    start = end - timedelta(days=days)
+
+    try:
+        t = yf.Ticker(ticker.upper())
+        hist = t.history(start=start.strftime("%Y-%m-%d"), end=end.strftime("%Y-%m-%d"), interval=interval)
+        if hist.empty:
+            raise HTTPException(404, f"No data for {ticker}")
+        results = []
+        for idx, row in hist.iterrows():
+            results.append({
+                "time": idx.isoformat(),
+                "price": float(round(row["Close"], 2)),
+                "high": float(round(row["High"], 2)),
+                "low": float(round(row["Low"], 2)),
+                "volume": int(row["Volume"]) if "Volume" in row and row["Volume"] else None,
+            })
+        return results
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ticker history error for {ticker}: {e}")
+        raise HTTPException(502, f"Failed to fetch history: {e}")
+
+
+# ── News ───────────────────────────────────────────────────
+
+_news_cache: dict = {"result": None, "timestamp": None}
+_NEWS_CACHE_TTL = 300  # 5 minutes
+
+
+def _fetch_news() -> list[dict]:
+    """Fetch market news from yfinance for tracked instruments and indices."""
+    import yfinance as yf
+    from datetime import timezone
+
+    seen_urls: set[str] = set()
+    articles: list[dict] = []
+
+    # Fetch news for key tickers (broad market + sectors)
+    news_tickers = ["SPY", "QQQ", "DIA", "XLK", "XLE", "GLD", "TLT"]
+    for sym in news_tickers:
+        try:
+            ticker = yf.Ticker(sym)
+            news = ticker.news
+            if not news:
+                continue
+            for item in news:
+                content = item.get("content", {})
+                url = content.get("canonicalUrl", {}).get("url", "")
+                if not url or url in seen_urls:
+                    continue
+                seen_urls.add(url)
+
+                pub_date = content.get("pubDate", "")
+                provider = content.get("provider", {}).get("displayName", "")
+                title = content.get("title", "")
+
+                # Extract related tickers from content
+                tickers_mentioned = []
+                for fin in content.get("finance", {}).get("stockTickers", []):
+                    tickers_mentioned.append(fin.get("symbol", ""))
+
+                if title:
+                    articles.append({
+                        "title": title,
+                        "url": url,
+                        "source": provider,
+                        "published": pub_date,
+                        "tickers": tickers_mentioned,
+                        "related_query": sym,
+                    })
+        except Exception as e:
+            logger.debug(f"News fetch failed for {sym}: {e}")
+
+    # Sort by published date descending
+    articles.sort(key=lambda a: a.get("published", ""), reverse=True)
+    return articles[:50]
+
+
+@app.get("/api/news")
+def get_news():
+    """Return latest market news headlines."""
+    now = datetime.now()
+    if (_news_cache["result"] is not None
+            and _news_cache["timestamp"] is not None
+            and (now - _news_cache["timestamp"]).total_seconds() < _NEWS_CACHE_TTL):
+        return _news_cache["result"]
+
+    articles = _fetch_news()
+    result = {"articles": articles, "timestamp": now.isoformat()}
+    _news_cache["result"] = result
+    _news_cache["timestamp"] = now
+    return result
+
+
 # ── Trade Log ──────────────────────────────────────────────
 
 @app.get("/api/trades")
@@ -331,7 +436,7 @@ def get_report(filename: str):
 
 TASK_REGISTRY = {
     "research": {"name": "Market Research", "func": run_research},
-    "hourly_check": {"name": "Hourly Market Check", "func": run_hourly_check},
+    "hourly_check": {"name": "Market Check", "func": run_hourly_check},
     "morning_report": {"name": "Morning Report", "func": run_morning_report},
     "compaction": {"name": "Memory Compaction", "func": run_compaction},
     "sentiment": {"name": "Sentiment Analysis", "func": run_sentiment},
@@ -377,7 +482,10 @@ def get_tasks():
                 last_run = entry
                 break
 
-        is_running = task_id in _running_tasks and _running_tasks[task_id].is_alive()
+        is_running = (
+            (task_id in _running_tasks and _running_tasks[task_id].is_alive())
+            or (last_run is not None and last_run.get("status") == "running")
+        )
 
         cron = _get_task_cron(task_id)
 
@@ -696,6 +804,41 @@ def clear_research_cache():
     from research.cache import research_cache
     research_cache.clear()
     return {"status": "cleared"}
+
+
+@app.get("/api/score-weights")
+def get_score_weights():
+    """Return current adaptive score dimension weights."""
+    from score_weights import _load_all, DEFAULT_WEIGHTS
+    all_weights = _load_all()
+    return {"weights": all_weights, "defaults": DEFAULT_WEIGHTS}
+
+
+# ── Stress Test ────────────────────────────────────────────
+
+_stress_cache: dict = {"result": None, "timestamp": None}
+_STRESS_CACHE_TTL = 300  # 5 minutes
+
+
+@app.get("/api/stress-test")
+def get_stress_test():
+    """Run portfolio stress test scenarios and return results."""
+    from stress_test import run_stress_test
+
+    now = datetime.now()
+    if (_stress_cache["result"] is not None
+            and _stress_cache["timestamp"] is not None
+            and (now - _stress_cache["timestamp"]).total_seconds() < _STRESS_CACHE_TTL):
+        return _stress_cache["result"]
+
+    portfolio = load_portfolio()
+    instruments = fetch_instrument_prices()
+    technicals = fetch_technical_indicators()
+
+    result = run_stress_test(portfolio, instruments, technicals)
+    _stress_cache["result"] = result
+    _stress_cache["timestamp"] = now
+    return result
 
 
 # ── Portfolio Expansion Proposals ──────────────────────────
