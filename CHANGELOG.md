@@ -2,6 +2,10 @@
 
 ## 2026-04-03
 
+### Changed
+- Expansion proposals list now sorts pending items to the top, then by newest first
+- Nav bar shows a yellow dot indicator next to "Expansion" when pending proposals are available (polled every 60s)
+
 ### Fixed
 - Fixed events calendar agent timing out during research — switched `EVENTS_MODEL` from `qwen3.5:latest` to `qwen2.5:7b` (faster for structured generation) and added configurable `EVENTS_TIMEOUT` (default 600s)
 - Fixed research agent timing out — added configurable `RESEARCH_TIMEOUT` (default 600s) applied to both LLM calls in the research cycle (summarizer + main analysis)

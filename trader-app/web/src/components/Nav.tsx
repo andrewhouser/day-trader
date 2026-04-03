@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
+import { api } from "@/lib/api";
 
 interface TabGroup {
   label: string;
@@ -50,6 +52,20 @@ const TAB_GROUPS: TabGroup[] = [
 
 export default function Nav() {
   const pathname = usePathname();
+  const [pendingCount, setPendingCount] = useState(0);
+
+  useEffect(() => {
+    let mounted = true;
+    async function check() {
+      try {
+        const p = await api.getProposals("pending");
+        if (mounted) setPendingCount(p.length);
+      } catch { /* ignore */ }
+    }
+    check();
+    const id = setInterval(check, 60_000);
+    return () => { mounted = false; clearInterval(id); };
+  }, []);
 
   return (
     <nav className="nav" role="navigation" aria-label="Main navigation">
@@ -66,6 +82,20 @@ export default function Nav() {
                 aria-selected={pathname === t.href}
               >
                 {t.label}
+                {t.href === "/expansion" && pendingCount > 0 && (
+                  <span
+                    aria-label={`${pendingCount} pending proposals`}
+                    style={{
+                      display: "inline-block",
+                      width: 7,
+                      height: 7,
+                      borderRadius: "50%",
+                      background: "var(--yellow)",
+                      marginLeft: 5,
+                      verticalAlign: "middle",
+                    }}
+                  />
+                )}
               </Link>
             ))}
           </div>

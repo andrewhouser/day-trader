@@ -24,7 +24,12 @@ export default function Expansion() {
         api.getProposals(filter),
         api.getTradeableInstruments(),
       ]);
-      setProposals(p);
+      const sorted = [...p].sort((a, b) => {
+        if (a.status === "pending" && b.status !== "pending") return -1;
+        if (a.status !== "pending" && b.status === "pending") return 1;
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      });
+      setProposals(sorted);
       setInstruments(inst);
       setMessage("");
     } catch (e: unknown) {
