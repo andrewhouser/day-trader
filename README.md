@@ -4,7 +4,7 @@ A fully autonomous, simulated day-trading agent that monitors global markets, ex
 
 No real money is involved. All trades are simulated and tracked on disk.
 
-![Paper Day Trader](../images/PaperDayTrader.png)
+![Paper Day Trader](images/PaperDayTrader.png)
 
 ## Architecture
 
