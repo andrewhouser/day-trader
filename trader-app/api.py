@@ -3,6 +3,7 @@ import json
 import logging
 import os
 import threading
+from contextlib import asynccontextmanager
 from datetime import datetime
 from pathlib import Path
 
@@ -36,7 +37,22 @@ from regime import detect_regime, load_regime
 
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="Day Trader Agent API", version="1.0.0")
+
+@asynccontextmanager
+async def lifespan(application):
+    """Start scheduler on startup, shut down on exit."""
+    from scheduler import start_background_scheduler
+    logger.info("Loading user-approved instruments...")
+    load_approved_into_config()
+    logger.info("Starting background scheduler alongside API...")
+    scheduler = start_background_scheduler()
+    yield
+    if scheduler and scheduler.running:
+        scheduler.shutdown(wait=False)
+        logger.info("Background scheduler stopped")
+
+
+app = FastAPI(title="Day Trader Agent API", version="1.0.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
