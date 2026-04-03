@@ -13,6 +13,7 @@ COMPACTION_MODEL = os.getenv("COMPACTION_MODEL", "phi3:3.8b")  # Compaction (lig
 TEMPERATURE = float(os.getenv("TEMPERATURE", "0.3"))
 OLLAMA_TIMEOUT = int(os.getenv("OLLAMA_TIMEOUT", "300"))  # Default timeout for Ollama requests (seconds)
 EVENTS_TIMEOUT = int(os.getenv("EVENTS_TIMEOUT", "600"))  # Extended timeout for events calendar (seconds)
+RESEARCH_TIMEOUT = int(os.getenv("RESEARCH_TIMEOUT", "600"))  # Extended timeout for research agent (seconds)
 
 # Scheduling (cron-style, all times in TIMEZONE)
 # U.S. market hours: 9:30 AM – 4:00 PM ET, Mon–Fri

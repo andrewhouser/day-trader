@@ -95,7 +95,7 @@ Prioritize primary sources (FRED, BLS, SEC, central banks) over commentary.
 If primary and secondary sources conflict, note the discrepancy.
 Total items analyzed: {len(report.all_items)}"""
 
-    response = call_ollama(prompt, system=SUMMARIZER_SYSTEM, model=config.RESEARCH_MODEL)
+    response = call_ollama(prompt, system=SUMMARIZER_SYSTEM, model=config.RESEARCH_MODEL, timeout=config.RESEARCH_TIMEOUT)
     return response
 
 

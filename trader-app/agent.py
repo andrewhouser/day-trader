@@ -463,7 +463,7 @@ Think step by step. Be specific with numbers and levels. Cite sources.
 This note will be read before your next hourly trading check."""
 
     logger.info("Sending multi-source research prompt to LLM...")
-    response = call_ollama(prompt, model=config.RESEARCH_MODEL)
+    response = call_ollama(prompt, model=config.RESEARCH_MODEL, timeout=config.RESEARCH_TIMEOUT)
     logger.info(f"Research response received ({len(response)} chars)")
 
     # Save research note to the existing log

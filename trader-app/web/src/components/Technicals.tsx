@@ -11,6 +11,36 @@ type RegimeData = {
   parameters: Record<string, unknown>;
 };
 
+const TOOLTIPS: Record<string, string> = {
+  VIX: "CBOE Volatility Index — measures expected 30-day S&P 500 volatility. Above 20 signals fear, below 15 signals complacency.",
+  "SPY RSI": "Relative Strength Index for SPY over 14 periods. Above 70 is overbought, below 30 is oversold.",
+  "SPY ROC(20d)": "Rate of Change — SPY's percentage price change over the last 20 trading days.",
+  "SMA 50/200": "50-day vs 200-day Simple Moving Average crossover. Golden Cross (50 > 200) is bullish, Death Cross is bearish.",
+  Ticker: "The ETF or instrument symbol.",
+  Price: "Latest market price.",
+  "SMA 20": "Simple Moving Average over 20 days — short-term trend direction.",
+  "SMA 50": "Simple Moving Average over 50 days — medium-term trend direction.",
+  "SMA 200": "Simple Moving Average over 200 days — long-term trend direction.",
+  RSI: "Relative Strength Index (14-period). Above 70 is overbought, below 30 is oversold.",
+  "MACD Hist": "MACD Histogram — difference between the MACD line and signal line. Positive is bullish momentum, negative is bearish.",
+  ATR: "Average True Range (14-period) — measures daily price volatility in dollar terms.",
+  "BB Low": "Bollinger Band lower bound (SMA 20 − 2 std dev). Price near this level may be oversold.",
+  "BB High": "Bollinger Band upper bound (SMA 20 + 2 std dev). Price near this level may be overbought.",
+  "Vol Ratio": "Volume Ratio — today's volume divided by the 20-day average. Above 1 means higher-than-normal activity.",
+  "ROC 20d": "Rate of Change — percentage price change over the last 20 trading days.",
+};
+
+function Tip({ label }: { label: string }) {
+  const tip = TOOLTIPS[label];
+  if (!tip) return <>{label}</>;
+  return (
+    <span className="tip-wrapper">
+      {label}
+      <span className="tip-bubble">{tip}</span>
+    </span>
+  );
+}
+
 export default function Technicals() {
   const [technicals, setTechnicals] = useState<TechnicalData | null>(null);
   const [regime, setRegime] = useState<RegimeData | null>(null);
@@ -66,10 +96,10 @@ export default function Technicals() {
             </span>
           </div>
           <div style={{ marginTop: "0.75rem", fontSize: "0.85rem", display: "flex", gap: "1.5rem", flexWrap: "wrap" }}>
-            {regime.signals.vix != null && <span>VIX: {String(regime.signals.vix)}</span>}
-            {regime.signals.rsi != null && <span>SPY RSI: {String(regime.signals.rsi)}</span>}
-            {regime.signals.roc_20 != null && <span>SPY ROC(20d): {String(regime.signals.roc_20)}%</span>}
-            <span>SMA 50/200: {regime.signals.golden_cross ? "Golden Cross ✅" : "Death Cross ❌"}</span>
+            {regime.signals.vix != null && <span><Tip label="VIX" />: {String(regime.signals.vix)}</span>}
+            {regime.signals.rsi != null && <span><Tip label="SPY RSI" />: {String(regime.signals.rsi)}</span>}
+            {regime.signals.roc_20 != null && <span><Tip label="SPY ROC(20d)" />: {String(regime.signals.roc_20)}%</span>}
+            <span><Tip label="SMA 50/200" />: {regime.signals.golden_cross ? "Golden Cross ✅" : "Death Cross ❌"}</span>
           </div>
         </div>
       )}
@@ -80,18 +110,18 @@ export default function Technicals() {
           <table>
             <thead>
               <tr>
-                <th>Ticker</th>
-                <th>Price</th>
-                <th>SMA 20</th>
-                <th>SMA 50</th>
-                <th>SMA 200</th>
-                <th>RSI</th>
-                <th>MACD Hist</th>
-                <th>ATR</th>
-                <th>BB Low</th>
-                <th>BB High</th>
-                <th>Vol Ratio</th>
-                <th>ROC 20d</th>
+                <th><Tip label="Ticker" /></th>
+                <th><Tip label="Price" /></th>
+                <th><Tip label="SMA 20" /></th>
+                <th><Tip label="SMA 50" /></th>
+                <th><Tip label="SMA 200" /></th>
+                <th><Tip label="RSI" /></th>
+                <th><Tip label="MACD Hist" /></th>
+                <th><Tip label="ATR" /></th>
+                <th><Tip label="BB Low" /></th>
+                <th><Tip label="BB High" /></th>
+                <th><Tip label="Vol Ratio" /></th>
+                <th><Tip label="ROC 20d" /></th>
               </tr>
             </thead>
             <tbody>
