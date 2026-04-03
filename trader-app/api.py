@@ -50,6 +50,46 @@ _running_tasks: dict[str, threading.Thread] = {}
 _task_history: list[dict] = []
 _task_lock = threading.Lock()
 
+# Max entries to keep in the history file to prevent unbounded growth
+_TASK_HISTORY_MAX = 500
+
+
+def _load_task_history():
+    """Load task history from disk on startup.
+    Marks any entries left in 'running' state (from a previous crash) as interrupted."""
+    global _task_history
+    try:
+        with open(config.TASK_HISTORY_PATH, "r") as f:
+            _task_history = json.load(f)
+        # Fix stale "running" entries from a previous process
+        dirty = False
+        for entry in _task_history:
+            if entry.get("status") == "running":
+                entry["status"] = "interrupted"
+                entry["error"] = "Process restarted before task completed"
+                entry["finished_at"] = entry.get("started_at")
+                dirty = True
+        if dirty:
+            _save_task_history()
+        logger.info(f"Loaded {len(_task_history)} task history entries from disk")
+    except (FileNotFoundError, json.JSONDecodeError):
+        _task_history = []
+
+
+def _save_task_history():
+    """Persist task history to disk. Call with _task_lock held."""
+    try:
+        # Trim to max entries before saving
+        trimmed = _task_history[-_TASK_HISTORY_MAX:]
+        with open(config.TASK_HISTORY_PATH, "w") as f:
+            json.dump(trimmed, f, indent=2)
+    except Exception as e:
+        logger.error(f"Failed to save task history: {e}")
+
+
+# Load history from previous runs on import
+_load_task_history()
+
 
 def _run_task_in_thread(task_id: str, task_name: str, func):
     """Run an agent task in a background thread, tracking status."""
@@ -64,6 +104,7 @@ def _run_task_in_thread(task_id: str, task_name: str, func):
     }
     with _task_lock:
         _task_history.append(entry)
+        _save_task_history()
 
     try:
         func()
@@ -76,6 +117,7 @@ def _run_task_in_thread(task_id: str, task_name: str, func):
         entry["finished_at"] = datetime.now().isoformat()
         with _task_lock:
             _running_tasks.pop(task_id, None)
+            _save_task_history()
 
 
 # ── Portfolio ──────────────────────────────────────────────

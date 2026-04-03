@@ -38,6 +38,7 @@ EVENTS_PATH = os.path.join(DATA_DIR, "events.md")
 PORTFOLIO_HISTORY_PATH = os.path.join(DATA_DIR, "portfolio_history.json")
 MARKET_RESEARCH_PATH = os.path.join(DATA_DIR, "market_research.json")
 MARKET_BRIEF_PATH = os.path.join(DATA_DIR, "market_brief.md")
+TASK_HISTORY_PATH = os.path.join(DATA_DIR, "task_history.json")
 
 # Market data
 MARKET_DATA_SOURCE = os.getenv("MARKET_DATA_SOURCE", "yfinance")  # yfinance or alphavantage
