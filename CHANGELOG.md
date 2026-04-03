@@ -12,6 +12,7 @@
 - Fixed portfolio history chart showing identical data for all time ranges — backend now uses timezone-aware date filtering
 
 ### Added
+- "Finished" column on the Scheduled Tasks table in the Dashboard showing when each task last completed
 - Configurable Ollama timeout via `OLLAMA_TIMEOUT` env var (default 300s); `call_ollama` now accepts an optional `timeout` parameter so any agent can override the default
 - Index tracker bar at the top of the Dashboard showing live data for S&P 500, NASDAQ, DOW, Nikkei 225, and FTSE 100 with price, direction arrow, change, and change percentage
 - Dedicated model configuration for Events (`EVENTS_MODEL`) and Expansion (`EXPANSION_MODEL`) agents

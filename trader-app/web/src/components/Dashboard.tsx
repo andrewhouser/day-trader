@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { api, Portfolio, TaskInfo } from "@/lib/api";
+import { cronToHuman } from "@/lib/cron";
 import PortfolioChart from "./PortfolioChart";
 import IndexTracker from "./IndexTracker";
 
@@ -159,6 +160,7 @@ export default function Dashboard() {
               <th>Schedule</th>
               <th>Status</th>
               <th>Last Run</th>
+              <th>Finished</th>
               <th>Result</th>
             </tr>
           </thead>
@@ -166,7 +168,7 @@ export default function Dashboard() {
             {tasks.map((task) => (
               <tr key={task.task_id}>
                 <td style={{ fontWeight: 600 }}>{task.name}</td>
-                <td><code style={{ fontSize: "0.8rem" }}>{task.cron}</code></td>
+                <td style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>{cronToHuman(task.cron)}</td>
                 <td>
                   {task.is_running ? (
                     <span className="badge badge-yellow">Running <span className="spinner" style={{ marginLeft: 4 }} /></span>
@@ -176,6 +178,9 @@ export default function Dashboard() {
                 </td>
                 <td style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>
                   {task.last_run ? new Date(task.last_run.started_at).toLocaleString() : "Never"}
+                </td>
+                <td style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>
+                  {task.last_run?.finished_at ? new Date(task.last_run.finished_at).toLocaleString() : "—"}
                 </td>
                 <td>
                   {task.last_run ? (
