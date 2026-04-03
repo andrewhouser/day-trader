@@ -1,0 +1,7 @@
+__pycache__
+*.pyc
+.git
+.env
+*.md
+!trader/trade_log.md
+!trader/reflections.md

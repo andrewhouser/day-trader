@@ -1,0 +1,48 @@
+services:
+  trader:
+    build: .
+    container_name: day-trader-agent
+    restart: unless-stopped
+    environment:
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      - TRADER_MODEL_NAME=deepseek-r1:14b
+      - RESEARCH_MODEL=qwen2.5:7b
+      - REPORT_MODEL=phi3:3.8b
+      - TEMPERATURE=0.3
+      - HOURLY_CRON=0,30 9-16 * * 1-5
+      - MORNING_REPORT_CRON=0 7 * * 1-5
+      - RESEARCH_CRON=5/10 9-16 * * 1-5
+      - STOP_LOSS_PCT=3.0
+      - OPPORTUNITY_PCT=2.0
+      - COMPACTION_CRON=0 5 * * 1-5
+      - SENTIMENT_CRON=0 8,12,16 * * 1-5
+      - RISK_MONITOR_CRON=*/3 9-16 * * 1-5
+      - REBALANCER_CRON=0 6 * * 1
+      - PERFORMANCE_CRON=0 6 * * 5
+      - EVENTS_CRON=0 6 * * 1-5
+      - EXPANSION_CRON=0 7 * * 3
+      - TZ=America/New_York
+      # Multi-source research engine API keys (optional — adapters degrade gracefully)
+      - FRED_API_KEY=${FRED_API_KEY:-}
+      - FINNHUB_API_KEY=${FINNHUB_API_KEY:-}
+      - ALPHA_VANTAGE_KEY=${ALPHA_VANTAGE_KEY:-}
+      - SEC_EDGAR_CONTACT=${SEC_EDGAR_CONTACT:-research-agent@example.com}
+      - RESEARCH_MAX_WORKERS=5
+      - RESEARCH_CACHE_ENABLED=true
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./trader:/app/trader
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  web:
+    build: ./web
+    container_name: day-trader-web
+    restart: unless-stopped
+    environment:
+      - API_URL=http://trader:8000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - trader
