@@ -40,7 +40,10 @@ const TAB_GROUPS: TabGroup[] = [
   },
   {
     label: "System",
-    tabs: [{ href: "/tasks", label: "Tasks" }],
+    tabs: [
+      { href: "/tasks", label: "Tasks" },
+      { href: "/chat", label: "Chat" },
+    ],
   },
 ];
 

@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { api, Portfolio, TaskInfo } from "@/lib/api";
 import { cronToHuman } from "@/lib/cron";
 import PortfolioChart from "./PortfolioChart";
-import IndexTracker from "./IndexTracker";
 
 export default function Dashboard() {
   const [portfolio, setPortfolio] = useState<Portfolio | null>(null);
@@ -47,9 +46,6 @@ export default function Dashboard() {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "1rem", paddingBottom: "2rem" }}>
-      {/* Market Indices */}
-      <IndexTracker />
-
       {/* Stats row */}
       <div className="grid-4">
         <div className="card">

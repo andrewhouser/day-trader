@@ -9,6 +9,7 @@ from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 
 import config
 from agent import (
@@ -736,3 +737,137 @@ def reject_single_proposal(proposal_id: str, reason: str = ""):
 def get_approved_instruments():
     """Return all currently tradeable instruments (core + approved expansions)."""
     return config.INSTRUMENTS
+
+
+# ── Chat ───────────────────────────────────────────────────
+
+CHAT_SYSTEM = (
+    "You are the Day Trader Agent's analyst assistant. The user is the portfolio owner "
+    "reviewing your trading decisions. Answer questions about positions, trades, research, "
+    "risk, sentiment, and strategy using the context provided. Be specific — cite data, "
+    "dates, prices, and reasoning. If you don't have enough context to answer, say so. "
+    "Never fabricate trades or data."
+)
+
+CHAT_MODEL = os.getenv("CHAT_MODEL", None)  # Falls back to RESEARCH_MODEL
+CHAT_TIMEOUT = int(os.getenv("CHAT_TIMEOUT", "300"))
+
+
+def _build_chat_context() -> str:
+    """Gather current agent state for the chat LLM context."""
+    from agent import call_ollama, read_recent_entries
+
+    sections = []
+
+    # Portfolio
+    try:
+        portfolio = load_portfolio()
+        positions = portfolio.get("positions", [])
+        pos_summary = "\n".join(
+            f"  {p['ticker']}: {p['quantity']} shares @ ${p['entry_price']:.2f} "
+            f"(current ${p['current_price']:.2f}, P&L ${p['unrealized_pnl']:.2f})"
+            for p in positions
+        ) or "  No open positions."
+        sections.append(
+            f"### Portfolio\n"
+            f"Cash: ${portfolio['cash_usd']:.2f} | "
+            f"Total: ${portfolio['total_value_usd']:.2f} | "
+            f"Trades: {portfolio.get('trade_count', 0)}\n{pos_summary}"
+        )
+    except Exception:
+        sections.append("### Portfolio\nUnavailable.")
+
+    # Regime
+    try:
+        regime_data = load_regime()
+        if regime_data:
+            params = regime_data.get("parameters", {})
+            sections.append(
+                f"### Market Regime\n{regime_data['regime']} — "
+                f"{params.get('strategy_note', '')}"
+            )
+    except Exception:
+        pass
+
+    # Recent trades
+    try:
+        trades = read_recent_entries(config.TRADE_LOG_PATH, 10)
+        if trades.strip():
+            sections.append(f"### Recent Trades\n{trades}")
+    except Exception:
+        pass
+
+    # Recent research
+    try:
+        research = read_recent_entries(config.RESEARCH_PATH, 3)
+        if research.strip():
+            sections.append(f"### Recent Research\n{research}")
+    except Exception:
+        pass
+
+    # Recent reflections
+    try:
+        reflections = read_recent_entries(config.REFLECTIONS_PATH, 5)
+        if reflections.strip():
+            sections.append(f"### Recent Reflections\n{reflections}")
+    except Exception:
+        pass
+
+    # Risk alerts
+    try:
+        risk = read_recent_entries(config.RISK_ALERTS_PATH, 5)
+        if risk.strip():
+            sections.append(f"### Risk Alerts\n{risk}")
+    except Exception:
+        pass
+
+    # Events
+    try:
+        with open(config.EVENTS_PATH, "r") as f:
+            events = f.read()[:2000]
+        if events.strip():
+            sections.append(f"### Upcoming Events\n{events}")
+    except Exception:
+        pass
+
+    return "\n\n".join(sections)
+
+
+class ChatRequest(BaseModel):
+    message: str
+
+
+@app.post("/api/chat")
+def chat(body: ChatRequest):
+    """Chat with the trading agent about its decisions."""
+    from agent import call_ollama
+
+    message = body.message.strip()
+    if not message:
+        raise HTTPException(400, "Message is required")
+
+    try:
+        context = _build_chat_context()
+    except Exception as e:
+        logger.error(f"Chat context build failed: {e}")
+        context = "Context unavailable."
+
+    prompt = f"""The portfolio owner is asking you a question. Use the context below to answer.
+
+{context}
+
+---
+
+User question: {message}"""
+
+    model = CHAT_MODEL or config.RESEARCH_MODEL
+    try:
+        response = call_ollama(prompt, system=CHAT_SYSTEM, model=model, timeout=CHAT_TIMEOUT)
+    except Exception as e:
+        logger.error(f"Chat LLM call failed: {e}")
+        raise HTTPException(502, f"LLM request failed: {e}")
+
+    if response.startswith("[ERROR]"):
+        raise HTTPException(502, response)
+
+    return {"response": response}

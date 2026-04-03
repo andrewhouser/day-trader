@@ -193,4 +193,6 @@ export const api = {
     postJson<ExpansionProposal>(`/expansion/proposals/${id}/reject${reason ? `?reason=${encodeURIComponent(reason)}` : ""}`),
   getTradeableInstruments: () =>
     fetchJson<Record<string, { type: string; tracks: string }>>("/expansion/instruments"),
+  chat: (message: string) =>
+    postJsonWithBody<{ response: string }>("/chat", { message }),
 };

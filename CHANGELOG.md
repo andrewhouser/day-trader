@@ -4,15 +4,20 @@
 
 ### Fixed
 - Fixed events calendar agent timing out during research — switched `EVENTS_MODEL` from `qwen3.5:latest` to `qwen2.5:7b` (faster for structured generation) and added configurable `EVENTS_TIMEOUT` (default 600s)
+- Fixed research agent timing out — added configurable `RESEARCH_TIMEOUT` (default 600s) applied to both LLM calls in the research cycle (summarizer + main analysis)
 - Fixed scheduled tasks dashboard not staying in sync with actual executions — API was serving task status from a stale in-memory snapshot; both `/api/tasks` and `/api/tasks/history` now re-read from disk before responding so scheduler-triggered runs are reflected immediately
 - Fixed `portfolio.json` being tracked by git despite `.gitignore` rule — removed from git index
+- Fixed chat endpoint returning 500 — Next.js middleware `rewrite()` was stripping POST request bodies; middleware now explicitly proxies non-GET requests via `fetch` to preserve bodies
 - Fixed scheduled tasks (research, sentiment, etc.) never firing — lifespan was set via `app.router.lifespan_context` after construction, which FastAPI silently ignores; moved lifespan into the `FastAPI()` constructor so the background scheduler actually starts
 - Fixed 500 Internal Server Error when running in Docker — Next.js standalone mode does not support `rewrites()` in `next.config.js`; added `middleware.ts` to proxy `/api/*` requests to the backend
 - Fixed Technicals page stuck on loading spinner — `getRegime()` failure no longer blocks `getTechnicals()` from rendering
 - Fixed portfolio history chart showing identical data for all time ranges — backend now uses timezone-aware date filtering
 
 ### Added
+- Chat interface (`/chat`) for interrogating agents about their trading decisions — gathers live portfolio, regime, trades, research, reflections, risk alerts, and events as context for each query
+- Tooltip explanations on all technical indicator labels (VIX, RSI, SMA, MACD, ATR, Bollinger Bands, etc.) in the Technicals page with custom styled tooltips
 - "Finished" column on the Scheduled Tasks table in the Dashboard showing when each task last completed
+- Index tracker bar now appears at the top of every page (moved from Dashboard to root layout)
 - Configurable Ollama timeout via `OLLAMA_TIMEOUT` env var (default 300s); `call_ollama` now accepts an optional `timeout` parameter so any agent can override the default
 - Index tracker bar at the top of the Dashboard showing live data for S&P 500, NASDAQ, DOW, Nikkei 225, and FTSE 100 with price, direction arrow, change, and change percentage
 - Dedicated model configuration for Events (`EVENTS_MODEL`) and Expansion (`EXPANSION_MODEL`) agents

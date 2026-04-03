@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import Nav from "@/components/Nav";
+import IndexTracker from "@/components/IndexTracker";
 
 export const metadata: Metadata = {
   title: "Day Trader Agent",
@@ -26,6 +27,7 @@ export default function RootLayout({
         </header>
         <div className="container">
           <Nav />
+          <IndexTracker />
           {children}
         </div>
       </body>
