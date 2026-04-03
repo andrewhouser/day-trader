@@ -3,9 +3,11 @@
 Runs as a background scheduler inside the FastAPI process,
 or standalone via `python scheduler.py`.
 """
+import json
 import logging
 import signal
 import sys
+from datetime import datetime
 
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.schedulers.blocking import BlockingScheduler
@@ -30,88 +32,95 @@ logger = logging.getLogger(__name__)
 
 _bg_scheduler: BackgroundScheduler | None = None
 
+# Task history shared with the API — loaded lazily to avoid circular imports
+_TASK_HISTORY_MAX = 500
+
+
+def _get_task_history_path() -> str:
+    return config.TASK_HISTORY_PATH
+
+
+def _load_task_history() -> list[dict]:
+    try:
+        with open(_get_task_history_path(), "r") as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return []
+
+
+def _save_task_history(history: list[dict]):
+    try:
+        trimmed = history[-_TASK_HISTORY_MAX:]
+        with open(_get_task_history_path(), "w") as f:
+            json.dump(trimmed, f, indent=2)
+    except Exception as e:
+        logger.error(f"Failed to save task history: {e}")
+
+
+def _tracked(task_id: str, task_name: str, func):
+    """Wrap a task function to record execution in the shared task history."""
+    def wrapper():
+        history = _load_task_history()
+        entry = {
+            "task_id": task_id,
+            "task_name": task_name,
+            "status": "running",
+            "started_at": datetime.now().isoformat(),
+            "finished_at": None,
+            "error": None,
+        }
+        history.append(entry)
+        _save_task_history(history)
+
+        try:
+            func()
+            entry["status"] = "completed"
+        except Exception as e:
+            logger.error(f"Scheduled task {task_id} failed: {e}")
+            entry["status"] = "failed"
+            entry["error"] = str(e)
+        finally:
+            entry["finished_at"] = datetime.now().isoformat()
+            # Re-load in case manual runs happened concurrently
+            history = _load_task_history()
+            # Update the entry we added (find by started_at match)
+            for h in reversed(history):
+                if h["task_id"] == task_id and h["started_at"] == entry["started_at"]:
+                    h["status"] = entry["status"]
+                    h["finished_at"] = entry["finished_at"]
+                    h["error"] = entry["error"]
+                    break
+            _save_task_history(history)
+
+    wrapper.__name__ = func.__name__
+    return wrapper
+
+
+JOBS = [
+    ("research", "Market Research", run_research, "RESEARCH_CRON", 300),
+    ("hourly_check", "Hourly Market Check", run_hourly_check, "HOURLY_CRON", 300),
+    ("morning_report", "Morning Report", run_morning_report, "MORNING_REPORT_CRON", 600),
+    ("compaction", "Memory Compaction", run_compaction, "COMPACTION_CRON", 600),
+    ("sentiment", "Sentiment Analysis", run_sentiment, "SENTIMENT_CRON", 300),
+    ("risk_monitor", "Risk Monitor", run_risk_monitor, "RISK_MONITOR_CRON", 60),
+    ("rebalancer", "Portfolio Rebalancer", run_rebalancer, "REBALANCER_CRON", 600),
+    ("performance", "Performance Analysis", run_performance_analysis, "PERFORMANCE_CRON", 600),
+    ("events", "Events Calendar", run_events_calendar, "EVENTS_CRON", 600),
+    ("expansion", "Portfolio Expansion", run_expansion_analysis, "EXPANSION_CRON", 600),
+]
+
 
 def _add_jobs(scheduler):
     """Add all scheduled jobs to a scheduler instance."""
-    scheduler.add_job(
-        run_research,
-        CronTrigger.from_crontab(config.RESEARCH_CRON, timezone=config.TIMEZONE),
-        id="research",
-        name="Market Research",
-        misfire_grace_time=300,
-    )
-
-    scheduler.add_job(
-        run_hourly_check,
-        CronTrigger.from_crontab(config.HOURLY_CRON, timezone=config.TIMEZONE),
-        id="hourly_check",
-        name="Hourly Market Check",
-        misfire_grace_time=300,
-    )
-
-    scheduler.add_job(
-        run_morning_report,
-        CronTrigger.from_crontab(config.MORNING_REPORT_CRON, timezone=config.TIMEZONE),
-        id="morning_report",
-        name="Morning Report",
-        misfire_grace_time=600,
-    )
-
-    scheduler.add_job(
-        run_compaction,
-        CronTrigger.from_crontab(config.COMPACTION_CRON, timezone=config.TIMEZONE),
-        id="compaction",
-        name="Memory Compaction",
-        misfire_grace_time=600,
-    )
-
-    scheduler.add_job(
-        run_sentiment,
-        CronTrigger.from_crontab(config.SENTIMENT_CRON, timezone=config.TIMEZONE),
-        id="sentiment",
-        name="Sentiment Analysis",
-        misfire_grace_time=300,
-    )
-
-    scheduler.add_job(
-        run_risk_monitor,
-        CronTrigger.from_crontab(config.RISK_MONITOR_CRON, timezone=config.TIMEZONE),
-        id="risk_monitor",
-        name="Risk Monitor",
-        misfire_grace_time=60,
-    )
-
-    scheduler.add_job(
-        run_rebalancer,
-        CronTrigger.from_crontab(config.REBALANCER_CRON, timezone=config.TIMEZONE),
-        id="rebalancer",
-        name="Portfolio Rebalancer",
-        misfire_grace_time=600,
-    )
-
-    scheduler.add_job(
-        run_performance_analysis,
-        CronTrigger.from_crontab(config.PERFORMANCE_CRON, timezone=config.TIMEZONE),
-        id="performance",
-        name="Performance Analysis",
-        misfire_grace_time=600,
-    )
-
-    scheduler.add_job(
-        run_events_calendar,
-        CronTrigger.from_crontab(config.EVENTS_CRON, timezone=config.TIMEZONE),
-        id="events",
-        name="Events Calendar",
-        misfire_grace_time=600,
-    )
-
-    scheduler.add_job(
-        run_expansion_analysis,
-        CronTrigger.from_crontab(config.EXPANSION_CRON, timezone=config.TIMEZONE),
-        id="expansion",
-        name="Portfolio Expansion",
-        misfire_grace_time=600,
-    )
+    for task_id, name, func, cron_attr, grace in JOBS:
+        cron_expr = getattr(config, cron_attr)
+        scheduler.add_job(
+            _tracked(task_id, name, func),
+            CronTrigger.from_crontab(cron_expr, timezone=config.TIMEZONE),
+            id=task_id,
+            name=name,
+            misfire_grace_time=grace,
+        )
 
 
 def start_background_scheduler() -> BackgroundScheduler:
@@ -120,7 +129,6 @@ def start_background_scheduler() -> BackgroundScheduler:
     if _bg_scheduler and _bg_scheduler.running:
         return _bg_scheduler
 
-    # Load user-approved instruments before scheduling any jobs
     load_approved_into_config()
 
     _bg_scheduler = BackgroundScheduler(timezone=config.TIMEZONE)
@@ -128,16 +136,8 @@ def start_background_scheduler() -> BackgroundScheduler:
     _bg_scheduler.start()
 
     logger.info("Background scheduler started")
-    logger.info(f"  Research: {config.RESEARCH_CRON}")
-    logger.info(f"  Hourly check: {config.HOURLY_CRON}")
-    logger.info(f"  Morning report: {config.MORNING_REPORT_CRON}")
-    logger.info(f"  Compaction: {config.COMPACTION_CRON}")
-    logger.info(f"  Sentiment: {config.SENTIMENT_CRON}")
-    logger.info(f"  Risk monitor: {config.RISK_MONITOR_CRON}")
-    logger.info(f"  Rebalancer: {config.REBALANCER_CRON}")
-    logger.info(f"  Performance: {config.PERFORMANCE_CRON}")
-    logger.info(f"  Events: {config.EVENTS_CRON}")
-    logger.info(f"  Expansion: {config.EXPANSION_CRON}")
+    for task_id, name, _, cron_attr, _ in JOBS:
+        logger.info(f"  {name}: {getattr(config, cron_attr)}")
     return _bg_scheduler
 
 
@@ -151,16 +151,8 @@ def main():
     logger.info("Day Trader Agent Starting (standalone scheduler)")
     logger.info(f"Model: {config.TRADER_MODEL_NAME} @ {config.OLLAMA_BASE_URL}")
     logger.info(f"Timezone: {config.TIMEZONE}")
-    logger.info(f"Research schedule: {config.RESEARCH_CRON}")
-    logger.info(f"Hourly schedule: {config.HOURLY_CRON}")
-    logger.info(f"Morning report schedule: {config.MORNING_REPORT_CRON}")
-    logger.info(f"Compaction schedule: {config.COMPACTION_CRON}")
-    logger.info(f"Sentiment schedule: {config.SENTIMENT_CRON}")
-    logger.info(f"Risk monitor schedule: {config.RISK_MONITOR_CRON}")
-    logger.info(f"Rebalancer schedule: {config.REBALANCER_CRON}")
-    logger.info(f"Performance schedule: {config.PERFORMANCE_CRON}")
-    logger.info(f"Events schedule: {config.EVENTS_CRON}")
-    logger.info(f"Expansion schedule: {config.EXPANSION_CRON}")
+    for task_id, name, _, cron_attr, _ in JOBS:
+        logger.info(f"  {name}: {getattr(config, cron_attr)}")
     logger.info(f"Data directory: {config.DATA_DIR}")
     logger.info("=" * 60)
 

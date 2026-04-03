@@ -26,6 +26,20 @@ async function postJsonWithBody<T>(path: string, body: Record<string, unknown> =
   return res.json();
 }
 
+async function putJson<T>(path: string, body: Record<string, unknown> = {}): Promise<T> {
+  const res = await fetch(`${BASE}${path}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => res.statusText);
+    throw new Error(text || `API error: ${res.status}`);
+  }
+  return res.json();
+}
+
 export interface Portfolio {
   cash_usd: number;
   positions: Position[];
@@ -160,6 +174,8 @@ export const api = {
   runTask: (taskId: string) => postJson<{ status: string }>(`/tasks/${taskId}/run`),
   stopTask: (taskId: string) =>
     postJson<{ status: string }>(`/tasks/${taskId}/stop`),
+  updateTaskSchedule: (taskId: string, cron: string) =>
+    putJson<{ task_id: string; cron: string }>(`/tasks/${taskId}/schedule`, { cron }),
   getConfig: () => fetchJson<AgentConfig>("/config"),
   getSentiment: (limit = 10) =>
     fetchJson<{ raw: string }[]>(`/sentiment?limit=${limit}`),

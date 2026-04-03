@@ -2,12 +2,15 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { api, TaskInfo, TaskHistoryEntry } from "@/lib/api";
+import { cronToHuman } from "@/lib/cron";
+import ScheduleEditor from "./ScheduleEditor";
 
 export default function Tasks() {
   const [tasks, setTasks] = useState<TaskInfo[]>([]);
   const [history, setHistory] = useState<TaskHistoryEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionMsg, setActionMsg] = useState("");
+  const [editingTask, setEditingTask] = useState<TaskInfo | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -47,6 +50,12 @@ export default function Tasks() {
     }
   }
 
+  async function handleScheduleSave(taskId: string, cron: string) {
+    await api.updateTaskSchedule(taskId, cron);
+    setActionMsg(`Schedule updated for ${taskId}`);
+    await load();
+  }
+
   if (loading) return <div className="empty-state"><span className="spinner" /> Loading tasks...</div>;
 
   return (
@@ -57,7 +66,6 @@ export default function Tasks() {
         </div>
       )}
 
-      {/* Task Controls */}
       <div className="section-title">Agent Tasks</div>
       <div className="grid-2">
         {tasks.map((task) => (
@@ -65,7 +73,20 @@ export default function Tasks() {
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "0.75rem" }}>
               <div>
                 <div style={{ fontWeight: 600, marginBottom: "0.25rem" }}>{task.name}</div>
-                <code style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>{task.cron}</code>
+                <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                  <span style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>{cronToHuman(task.cron)}</span>
+                  <button
+                    onClick={() => setEditingTask(task)}
+                    style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", padding: "0.1rem 0.25rem", fontSize: "0.75rem", lineHeight: 1 }}
+                    title="Edit schedule"
+                    aria-label={`Edit schedule for ${task.name}`}
+                  >
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M8.5 1.5l2 2L3.5 10.5H1.5v-2z" />
+                      <path d="M7 3l2 2" />
+                    </svg>
+                  </button>
+                </div>
               </div>
               {task.is_running ? (
                 <span className="badge badge-yellow">Running <span className="spinner" style={{ marginLeft: 4 }} /></span>
@@ -149,6 +170,17 @@ export default function Tasks() {
       <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", textAlign: "center" }}>
         Auto-refreshes every 5s
       </div>
+
+      {/* Schedule Editor Modal */}
+      {editingTask && (
+        <ScheduleEditor
+          taskId={editingTask.task_id}
+          taskName={editingTask.name}
+          currentCron={editingTask.cron}
+          onSave={handleScheduleSave}
+          onClose={() => setEditingTask(null)}
+        />
+      )}
     </div>
   );
 }

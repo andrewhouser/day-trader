@@ -55,3 +55,4 @@ trader-app/trader/trade_history.md
 trader-app/trader/lessons.md
 trader-app/trader/reports/*.md
 !trader-app/trader/reports/.gitkeep
+trader-app/trader/portfolio.json
