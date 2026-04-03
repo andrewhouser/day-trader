@@ -135,13 +135,28 @@ REGIME_PARAMS = {
         "max_position_pct": 0.10,
         "stop_atr_multiplier": 1.5,
         "regime_multiplier": 0.5,
-        "strategy_note": "Downtrend — reduce max position to 10%, favor cash and defensives (XLU, XLP, TLT, SHY, GLD)",
+        "strategy_note": (
+            "Downtrend — reduce max position to 10%, favor cash and defensives (XLU, XLP, TLT, SHY, GLD). "
+            "REGIME BIAS IS A DEFAULT, NOT AN ABSOLUTE RULE: before dismissing any instrument, check whether "
+            "it is moving independently of SPY. Energy (XLE, USO), gold (GLD), and commodities often trade on "
+            "supply/demand or geopolitical factors uncorrelated with equities. If an instrument has been trending "
+            "upward for 3+ sessions while SPY is falling, that is a divergence signal — score it on its own "
+            "technicals and fundamental driver rather than applying the cyclical penalty. Require: (a) multi-session "
+            "uptrend confirmation, (b) an identifiable fundamental driver, (c) position sized at the lower end of "
+            "the 10% cap given elevated market risk."
+        ),
     },
     "STRONG_DOWNTREND": {
         "max_position_pct": 0.10,
         "stop_atr_multiplier": 1.5,
         "regime_multiplier": 0.5,
-        "strategy_note": "Strong downtrend — reduce max position to 10%, favor cash, tighten stops, defensives only (XLU, XLP, TLT, SHY, GLD)",
+        "strategy_note": (
+            "Strong downtrend — reduce max position to 10%, favor cash, tighten stops, defensives only "
+            "(XLU, XLP, TLT, SHY, GLD). Divergence exceptions require very high conviction: 5+ sessions of "
+            "counter-trend movement with a clear fundamental catalyst (e.g., OPEC supply cut, geopolitical "
+            "supply disruption) and confirmation that the instrument is not merely exhibiting a dead-cat bounce. "
+            "Single-day spikes in strong downtrends are almost always noise — require multi-day follow-through."
+        ),
     },
     "HIGH_VOLATILITY": {
         "max_position_pct": 0.10,
@@ -196,6 +211,7 @@ INSTRUMENT SCOPE:
 - Bond ETFs: TLT (long-term treasury), SHY (short-term treasury), AGG (aggregate bond).
 - Commodity ETFs: GLD (gold), SLV (silver), USO (oil).
 - SECTOR ROTATION: In downtrends, favor defensive sectors (XLU, XLP) and bonds (TLT, SHY). In uptrends, favor cyclical sectors (XLK, XLF, XLE). In high volatility, favor safe havens (GLD, TLT, SHY).
+- SECTOR DIVERGENCE: Regime rules set a default bias — they are NOT a blanket veto. Energy (XLE, USO), gold (GLD), and silver (SLV) frequently move on supply, demand, or geopolitical drivers that are uncorrelated with — or even inversely correlated to — equity indices. If a sector ETF is trending strongly UPWARD while SPY is trending DOWNWARD over multiple sessions, it is behaving counter-cyclically in that context and deserves independent evaluation. Do NOT penalize it simply for being labeled "cyclical." Evaluate: (1) Is the instrument technically in its own uptrend (price above SMA-20, SMA-20 rising)? (2) Is there a clear fundamental driver (oil supply shock, flight-to-safety, dollar weakness)? (3) Is the divergence sustained across 3+ sessions or just a single-day spike? A single-day spike is noise. Sustained multi-session divergence with a confirmed driver is a genuine asymmetric opportunity and should be scored accordingly.
 - Additional instruments (individual stocks, REITs, etc.)
   may be added to your tradeable set over time through the expansion proposal process.
 - The expansion agent periodically suggests new instruments for portfolio diversification.

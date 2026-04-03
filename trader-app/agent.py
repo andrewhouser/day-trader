@@ -633,6 +633,11 @@ INSTRUCTIONS:
 2. Review the TECHNICAL INDICATORS above. Use moving average alignment, RSI, MACD, and Bollinger Bands to assess trend and momentum for each instrument.
 3. Note the MARKET REGIME ({regime_data.get('regime', 'UNKNOWN')}). Adjust your strategy accordingly:
    - {regime_params.get('strategy_note', 'No regime guidance available.')}
+3.5. **SECTOR DIVERGENCE ANALYSIS** — Before scoring any instrument, ask: is it moving WITH the market or AGAINST it?
+   - Scan the technicals for instruments that are in an uptrend (price > SMA-20, SMA-20 rising) while SPY is in a downtrend, or vice versa.
+   - If you find divergence, ask WHY: Is there a supply shock? A geopolitical event? Flight-to-safety demand? Dollar movement? A divergence with an identifiable fundamental driver is a genuine opportunity signal.
+   - Classify each diverging instrument as: (a) sustained divergence with driver = candidate for independent scoring; (b) single-session spike without confirmation = noise, discard; (c) divergence but no clear driver = hold, wait for confirmation.
+   - Do NOT apply the regime's instrument-type bias (e.g., "avoid cyclicals") to instruments confirmed to be in sustained divergence. Score them on their individual merits.
 4. Review the POSITION SIZING recommendations. These are volatility-scaled — volatile instruments get smaller positions. You may adjust within bounds but justify deviations.
 5. Review the sentiment analysis for qualitative signal from news headlines.
 6. Check the risk alerts — if the risk monitor flagged stop-losses, drawdowns, or volatility, address them explicitly.
@@ -641,11 +646,16 @@ INSTRUCTIONS:
 9. Check STOP-LOSS & TAKE-PROFIT levels for existing positions. Trailing stops are managed automatically, but factor them into your analysis.
 
 10. **SCORING FRAMEWORK** — Before making any trade decision, you MUST score each instrument you are considering on these dimensions:
-    - **Trend score** (-2 to +2): Based on moving average alignment (SMA 20/50/200) and direction
-    - **Momentum score** (-2 to +2): Based on RSI, MACD histogram, 20-day rate of change
+    - **Trend score** (-2 to +2): Based on the instrument's OWN moving average alignment (SMA 20/50/200) and direction — NOT the market's trend. A sector ETF can be in a strong uptrend while SPY is falling; evaluate it on its own chart.
+    - **Momentum score** (-2 to +2): Based on RSI, MACD histogram, 20-day rate of change. Strong momentum in a counter-cyclical direction (instrument rising while market falls) is a POSITIVE signal.
     - **Sentiment score** (-2 to +2): From the sentiment analysis data above
     - **Risk/reward score** (-2 to +2): Based on distance to Bollinger Bands, ATR-based targets
     - **Event risk score** (-2 to 0): Penalty for upcoming high-impact events
+    - **Sector divergence score** (-1 to +2): Assess whether the instrument is moving independently of the broad market.
+      - +2: Instrument in clear multi-session uptrend while SPY is in downtrend, with an identifiable fundamental driver (supply shock, geopolitical event, dollar movement, flight-to-safety)
+      - +1: Instrument showing moderate independence from SPY over 2-3 sessions with plausible driver
+      - 0: Instrument correlated with broad market, or insufficient data to determine
+      - -1: Instrument moving opposite to market without any discernible fundamental reason (suggests mean-reversion risk, not opportunity)
 
     Output scores as a JSON block BEFORE your trade decision:
     ```json
@@ -653,7 +663,7 @@ INSTRUCTIONS:
       "scores": {{
         "TICKER": {{
           "trend": 0, "momentum": 0, "sentiment": 0,
-          "risk_reward": 0, "event_risk": 0, "composite": 0
+          "risk_reward": 0, "event_risk": 0, "sector_divergence": 0, "composite": 0
         }}
       }}
     }}
@@ -663,6 +673,8 @@ INSTRUCTIONS:
     - Only BUY when composite score > {config.SCORE_BUY_THRESHOLD}
     - Only SELL (beyond automatic stops) when composite score < {config.SCORE_SELL_THRESHOLD}
     - Between {config.SCORE_SELL_THRESHOLD} and {config.SCORE_BUY_THRESHOLD}, default to HOLD
+    - **REGIME BIAS OVERRIDE**: The regime's instrument-type preference (e.g., "favor defensives in downtrend") is a DEFAULT, not a veto. If an instrument scores +1 or +2 on sector divergence AND scores positively on trend and momentum on its own merits, it is eligible for a BUY regardless of its classification as "cyclical." You MUST document the divergence driver explicitly in your trade reasoning.
+    - **SPIKE VS. TREND**: A single-session price spike (+5% in one day) without prior multi-session uptrend is NOT a divergence signal — it is noise. Do not buy spikes. Require at least 2-3 sessions of sustained price improvement to confirm divergence.
 
 11. If you decide to make a trade, output it as a JSON block:
 ```json
