@@ -104,12 +104,21 @@ def _sync_task_history():
 
 
 def _save_task_history():
-    """Persist task history to disk. Call with _task_lock held."""
+    """Persist task history to disk atomically. Call with _task_lock held.
+
+    Writes to a temp file then os.replace()-s it into place so a Docker
+    daemon kill mid-write cannot corrupt the history file.
+    """
+    import tempfile
     try:
-        # Trim to max entries before saving
         trimmed = _task_history[-_TASK_HISTORY_MAX:]
-        with open(config.TASK_HISTORY_PATH, "w") as f:
+        dir_path = os.path.dirname(config.TASK_HISTORY_PATH)
+        with tempfile.NamedTemporaryFile(
+            mode="w", dir=dir_path, suffix=".tmp", delete=False
+        ) as f:
             json.dump(trimmed, f, indent=2)
+            tmp_path = f.name
+        os.replace(tmp_path, config.TASK_HISTORY_PATH)
     except Exception as e:
         logger.error(f"Failed to save task history: {e}")
 
