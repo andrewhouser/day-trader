@@ -14,7 +14,7 @@ from position_sizing import get_sizing_summary
 logger = logging.getLogger(__name__)
 
 
-def call_ollama(prompt: str, system: str = config.SYSTEM_PROMPT, model: str | None = None) -> str:
+def call_ollama(prompt: str, system: str = config.SYSTEM_PROMPT, model: str | None = None, timeout: int | None = None) -> str:
     """Send a prompt to Ollama and return the response text."""
     url = f"{config.OLLAMA_BASE_URL}/api/generate"
     payload = {
@@ -27,7 +27,7 @@ def call_ollama(prompt: str, system: str = config.SYSTEM_PROMPT, model: str | No
         },
     }
     try:
-        resp = requests.post(url, json=payload, timeout=300)
+        resp = requests.post(url, json=payload, timeout=timeout or config.OLLAMA_TIMEOUT)
         resp.raise_for_status()
         return resp.json().get("response", "")
     except requests.exceptions.RequestException as e:

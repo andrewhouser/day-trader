@@ -121,7 +121,7 @@ Note: Use your best knowledge of the typical economic calendar schedule.
 If you're unsure of exact dates, note that and provide the typical schedule."""
 
     logger.info("Sending events prompt to LLM...")
-    response = call_ollama(prompt, system=EVENTS_SYSTEM, model=config.EVENTS_MODEL)
+    response = call_ollama(prompt, system=EVENTS_SYSTEM, model=config.EVENTS_MODEL, timeout=config.EVENTS_TIMEOUT)
     logger.info(f"Events calendar received ({len(response)} chars)")
 
     timestamp = today.strftime("%Y-%m-%d %H:%M:%S")

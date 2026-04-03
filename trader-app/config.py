@@ -7,10 +7,12 @@ TRADER_MODEL_NAME = os.getenv("TRADER_MODEL_NAME", "deepseek-r1:14b")  # Trading
 RESEARCH_MODEL = os.getenv("RESEARCH_MODEL", "qwen3.5:latest")  # Research, summarizer, performance, rebalancer (analysis/long context)
 REPORT_MODEL = os.getenv("REPORT_MODEL", "qwen2.5:7b")  # Morning report (formatting/summarization)
 SENTIMENT_MODEL = os.getenv("SENTIMENT_MODEL", "llama3.1:8b")  # Sentiment agent (classification)
-EVENTS_MODEL = os.getenv("EVENTS_MODEL", "qwen3.5:latest")  # Events calendar (structured generation)
+EVENTS_MODEL = os.getenv("EVENTS_MODEL", "qwen2.5:7b")  # Events calendar (structured generation, fast)
 EXPANSION_MODEL = os.getenv("EXPANSION_MODEL", "qwen3.5:latest")  # Expansion analysis (portfolio analysis)
 COMPACTION_MODEL = os.getenv("COMPACTION_MODEL", "phi3:3.8b")  # Compaction (lightweight summarization)
 TEMPERATURE = float(os.getenv("TEMPERATURE", "0.3"))
+OLLAMA_TIMEOUT = int(os.getenv("OLLAMA_TIMEOUT", "300"))  # Default timeout for Ollama requests (seconds)
+EVENTS_TIMEOUT = int(os.getenv("EVENTS_TIMEOUT", "600"))  # Extended timeout for events calendar (seconds)
 
 # Scheduling (cron-style, all times in TIMEZONE)
 # U.S. market hours: 9:30 AM – 4:00 PM ET, Mon–Fri

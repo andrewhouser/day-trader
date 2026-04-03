@@ -70,26 +70,37 @@ _task_lock = threading.Lock()
 _TASK_HISTORY_MAX = 500
 
 
+def _read_task_history_from_disk() -> list[dict]:
+    """Read task history directly from disk (picks up scheduler writes)."""
+    try:
+        with open(config.TASK_HISTORY_PATH, "r") as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return []
+
+
 def _load_task_history():
     """Load task history from disk on startup.
     Marks any entries left in 'running' state (from a previous crash) as interrupted."""
     global _task_history
-    try:
-        with open(config.TASK_HISTORY_PATH, "r") as f:
-            _task_history = json.load(f)
-        # Fix stale "running" entries from a previous process
-        dirty = False
-        for entry in _task_history:
-            if entry.get("status") == "running":
-                entry["status"] = "interrupted"
-                entry["error"] = "Process restarted before task completed"
-                entry["finished_at"] = entry.get("started_at")
-                dirty = True
-        if dirty:
-            _save_task_history()
-        logger.info(f"Loaded {len(_task_history)} task history entries from disk")
-    except (FileNotFoundError, json.JSONDecodeError):
-        _task_history = []
+    _task_history = _read_task_history_from_disk()
+    # Fix stale "running" entries from a previous process
+    dirty = False
+    for entry in _task_history:
+        if entry.get("status") == "running":
+            entry["status"] = "interrupted"
+            entry["error"] = "Process restarted before task completed"
+            entry["finished_at"] = entry.get("started_at")
+            dirty = True
+    if dirty:
+        _save_task_history()
+    logger.info(f"Loaded {len(_task_history)} task history entries from disk")
+
+
+def _sync_task_history():
+    """Re-sync in-memory history from disk to pick up scheduler-written entries."""
+    global _task_history
+    _task_history = _read_task_history_from_disk()
 
 
 def _save_task_history():
@@ -204,6 +215,7 @@ def get_regime():
 @app.get("/api/trades")
 def get_trades(limit: int = 50):
     """Return parsed trade log entries."""
+    import re
     raw = read_recent_entries(config.TRADE_LOG_PATH, limit)
     sections = raw.split("\n---\n")
     entries = []
@@ -233,6 +245,15 @@ def get_trades(limit: int = 50):
         # Detect "No Action" entries
         if "No Action" in section.split("\n")[0]:
             entry["action"] = "NO_ACTION"
+        # Fallback: extract date from header or anywhere in the section
+        if "date" not in entry:
+            m = re.search(r"(\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2})", section)
+            if m:
+                entry["date"] = m.group(1).replace("T", " ")
+            else:
+                m = re.search(r"(\d{4}-\d{2}-\d{2})", section)
+                if m:
+                    entry["date"] = m.group(1)
         entries.append(entry)
     entries.reverse()  # newest first
     return entries
@@ -312,22 +333,31 @@ TASK_REGISTRY = {
 }
 
 TASK_CRON_MAP = {
-    "research": config.RESEARCH_CRON,
-    "hourly_check": config.HOURLY_CRON,
-    "morning_report": config.MORNING_REPORT_CRON,
-    "compaction": config.COMPACTION_CRON,
-    "sentiment": config.SENTIMENT_CRON,
-    "risk_monitor": config.RISK_MONITOR_CRON,
-    "rebalancer": config.REBALANCER_CRON,
-    "performance": config.PERFORMANCE_CRON,
-    "events": config.EVENTS_CRON,
-    "expansion": config.EXPANSION_CRON,
+    "research": "RESEARCH_CRON",
+    "hourly_check": "HOURLY_CRON",
+    "morning_report": "MORNING_REPORT_CRON",
+    "compaction": "COMPACTION_CRON",
+    "sentiment": "SENTIMENT_CRON",
+    "risk_monitor": "RISK_MONITOR_CRON",
+    "rebalancer": "REBALANCER_CRON",
+    "performance": "PERFORMANCE_CRON",
+    "events": "EVENTS_CRON",
+    "expansion": "EXPANSION_CRON",
 }
+
+
+def _get_task_cron(task_id: str) -> str:
+    """Get the current cron expression for a task from config (live value)."""
+    attr = TASK_CRON_MAP.get(task_id)
+    if attr:
+        return getattr(config, attr, "—")
+    return "—"
 
 
 @app.get("/api/tasks")
 def get_tasks():
     """Return status of all tasks including schedule info and history."""
+    _sync_task_history()
     tasks = []
     for task_id, info in TASK_REGISTRY.items():
         # Find last run from history
@@ -339,7 +369,7 @@ def get_tasks():
 
         is_running = task_id in _running_tasks and _running_tasks[task_id].is_alive()
 
-        cron = TASK_CRON_MAP.get(task_id, "—")
+        cron = _get_task_cron(task_id)
 
         tasks.append({
             "task_id": task_id,
@@ -354,6 +384,7 @@ def get_tasks():
 @app.get("/api/tasks/history")
 def get_task_history(limit: int = 50):
     """Return recent task execution history."""
+    _sync_task_history()
     return list(reversed(_task_history[-limit:]))
 
 
@@ -389,6 +420,83 @@ def stop_task(task_id: str):
         # We can't truly kill a thread in Python, but we remove tracking
         _running_tasks.pop(task_id, None)
     return {"status": "stop_requested", "task_id": task_id}
+
+
+# ── Schedule persistence ───────────────────────────────────
+
+_SCHEDULE_OVERRIDES_PATH = os.path.join(config.DATA_DIR, "schedule_overrides.json")
+
+
+def _load_schedule_overrides():
+    """Load saved schedule overrides from disk and apply to config on startup."""
+    try:
+        with open(_SCHEDULE_OVERRIDES_PATH, "r") as f:
+            overrides = json.load(f)
+        for task_id, cron_expr in overrides.items():
+            attr = TASK_CRON_MAP.get(task_id)
+            if attr:
+                setattr(config, attr, cron_expr)
+        logger.info(f"Loaded {len(overrides)} schedule override(s) from disk")
+    except (FileNotFoundError, json.JSONDecodeError):
+        pass
+
+
+def _save_schedule_override(task_id: str, cron_expr: str):
+    """Persist a schedule override to disk."""
+    try:
+        with open(_SCHEDULE_OVERRIDES_PATH, "r") as f:
+            overrides = json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        overrides = {}
+    overrides[task_id] = cron_expr
+    with open(_SCHEDULE_OVERRIDES_PATH, "w") as f:
+        json.dump(overrides, f, indent=2)
+
+
+# Apply any saved overrides on startup
+_load_schedule_overrides()
+
+
+@app.put("/api/tasks/{task_id}/schedule")
+def update_task_schedule(task_id: str, body: dict):
+    """Update the cron schedule for a task. Expects {"cron": "..."}."""
+    from apscheduler.triggers.cron import CronTrigger
+    from scheduler import get_scheduler
+
+    if task_id not in TASK_REGISTRY:
+        raise HTTPException(404, f"Unknown task: {task_id}")
+
+    attr = TASK_CRON_MAP.get(task_id)
+    if not attr:
+        raise HTTPException(400, f"Task {task_id} has no configurable schedule")
+
+    cron_expr = body.get("cron", "").strip()
+    if not cron_expr:
+        raise HTTPException(400, "Missing 'cron' field")
+
+    # Validate the cron expression
+    try:
+        trigger = CronTrigger.from_crontab(cron_expr, timezone=config.TIMEZONE)
+    except (ValueError, KeyError) as e:
+        raise HTTPException(400, f"Invalid cron expression: {e}")
+
+    # Update config in memory
+    setattr(config, attr, cron_expr)
+
+    # Persist to disk
+    _save_schedule_override(task_id, cron_expr)
+
+    # Reschedule the running job
+    scheduler = get_scheduler()
+    if scheduler and scheduler.running:
+        try:
+            scheduler.reschedule_job(task_id, trigger=trigger)
+            logger.info(f"Rescheduled {task_id} to '{cron_expr}'")
+        except Exception as e:
+            logger.error(f"Failed to reschedule {task_id}: {e}")
+            raise HTTPException(500, f"Schedule saved but failed to reschedule: {e}")
+
+    return {"task_id": task_id, "cron": cron_expr}
 
 
 # ── Config / Status ────────────────────────────────────────
