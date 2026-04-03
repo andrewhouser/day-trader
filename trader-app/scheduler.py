@@ -49,10 +49,19 @@ def _load_task_history() -> list[dict]:
 
 
 def _save_task_history(history: list[dict]):
+    """Write task history atomically so a mid-write daemon kill can't corrupt it."""
+    import os
+    import tempfile
     try:
         trimmed = history[-_TASK_HISTORY_MAX:]
-        with open(_get_task_history_path(), "w") as f:
+        path = _get_task_history_path()
+        dir_path = os.path.dirname(path)
+        with tempfile.NamedTemporaryFile(
+            mode="w", dir=dir_path, suffix=".tmp", delete=False
+        ) as f:
             json.dump(trimmed, f, indent=2)
+            tmp_path = f.name
+        os.replace(tmp_path, path)
     except Exception as e:
         logger.error(f"Failed to save task history: {e}")
 
