@@ -122,7 +122,7 @@ def _compute_metrics(trades: list[dict], portfolio: dict) -> dict:
         "total_realized_pnl": round(total_realized_pnl, 2),
         "avg_win": round(avg_win, 2),
         "avg_loss": round(avg_loss, 2),
-        "profit_factor": round(abs(avg_win / avg_loss), 2) if avg_loss != 0 else float("inf"),
+        "profit_factor": round(abs(avg_win / avg_loss), 2) if avg_loss != 0 else None,
         "portfolio_value": portfolio["total_value_usd"],
         "starting_capital": portfolio["starting_capital"],
         "total_return_pct": round(pct_return, 2),
@@ -295,12 +295,12 @@ Produce a comprehensive performance report with these sections:
 Be quantitative. Use the actual numbers. Don't be vague."""
 
     logger.info("Sending performance analysis prompt to LLM...")
-    response = call_ollama(prompt, system=PERFORMANCE_SYSTEM, model=config.RESEARCH_MODEL, timeout=config.RESEARCH_TIMEOUT)
+    response = call_ollama(prompt, system=PERFORMANCE_SYSTEM, model=config.RESEARCH_MODEL, timeout=config.PERFORMANCE_TIMEOUT)
 
     # Retry once if the first attempt failed (Ollama may have been loading the model)
     if response.startswith("[ERROR]"):
         logger.warning("First performance LLM call failed, retrying...")
-        response = call_ollama(prompt, system=PERFORMANCE_SYSTEM, model=config.RESEARCH_MODEL, timeout=config.RESEARCH_TIMEOUT)
+        response = call_ollama(prompt, system=PERFORMANCE_SYSTEM, model=config.RESEARCH_MODEL, timeout=config.PERFORMANCE_TIMEOUT)
 
     logger.info(f"Performance analysis received ({len(response)} chars)")
 

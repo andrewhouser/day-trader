@@ -13,6 +13,11 @@
 ### Changed
 - Hourly trading prompt instructions expanded with section 10.5 covering overseas signal evaluation rules: standard scoring still required, high-urgency signals evaluated first, ETF gap-pricing staleness check, per-signal audit trail in analysis output
 
+### Fixed
+- **Performance analyst timeout** — both performance reports showed `read timeout=300` because the running container predated the extended timeout fix; added dedicated `PERFORMANCE_TIMEOUT` (default 900s) so the performance analyst gets its own generous timeout independent of `RESEARCH_TIMEOUT`; updated `docker-compose.yml` and `.env`
+- **`profit_factor: Infinity` in metrics JSON** — replaced `float("inf")` with `None` when no losing trades exist; `Infinity` is not valid standard JSON and could break downstream parsers
+- **`.env` / `docker-compose.yml` model mismatch** — `.env` had `EVENTS_MODEL=qwen2.5:7b` while `docker-compose.yml` had `qwen3.5:latest`; synced `.env` to match
+
 ## 2026-04-04 (review fixes)
 
 ### Fixed
