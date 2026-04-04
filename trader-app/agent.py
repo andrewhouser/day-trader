@@ -41,13 +41,17 @@ def call_ollama(prompt: str, system: str = config.SYSTEM_PROMPT, model: str | No
             pass
 
     url = f"{config.OLLAMA_BASE_URL}/api/generate"
+    resolved_model = model or config.TRADER_MODEL_NAME
     payload = {
-        "model": model or config.TRADER_MODEL_NAME,
+        "model": resolved_model,
         "prompt": prompt,
         "system": system,
         "stream": False,
         "options": {
             "temperature": config.TEMPERATURE,
+            # Disable Qwen3 extended thinking for non-reasoning tasks; has no
+            # effect on other model families (deepseek-r1, llama, phi3, etc.)
+            "think": resolved_model == config.TRADER_MODEL_NAME,
         },
     }
     try:

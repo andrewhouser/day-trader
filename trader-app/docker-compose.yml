@@ -13,6 +13,8 @@ services:
       - EXPANSION_MODEL=qwen3.5:latest
       - COMPACTION_MODEL=phi3:3.8b
       - TEMPERATURE=0.3
+      - RESEARCH_TIMEOUT=600
+      - EVENTS_TIMEOUT=600
       - HOURLY_CRON=0,30 9-16 * * 1-5
       - MORNING_REPORT_CRON=0 7 * * 1-5
       - RESEARCH_CRON=5/10 9-16 * * 1-5

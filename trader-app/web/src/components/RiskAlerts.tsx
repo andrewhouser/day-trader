@@ -55,7 +55,7 @@ export function RiskAlerts() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    api.getRiskAlerts(30).then(setEntries).finally(() => setLoading(false));
+    api.getRiskAlerts(5).then(setEntries).finally(() => setLoading(false));
   }, []);
 
   if (loading) {
