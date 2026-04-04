@@ -34,6 +34,8 @@ from risk_monitor import run_risk_monitor
 from rebalancer import run_rebalancer
 from performance_analyst import run_performance_analysis
 from events_agent import run_events_calendar
+from playbook_agent import run_playbook_update
+from market_context import update_market_context
 from regime import detect_regime, load_regime
 from overseas_monitors import run_nikkei_open, run_nikkei_reopen, run_ftse_open, run_europe_handoff
 
@@ -487,6 +489,8 @@ TASK_REGISTRY = {
     "performance": {"name": "Performance Analysis", "func": run_performance_analysis, "category": "Maintenance"},
     "events": {"name": "Events Calendar", "func": run_events_calendar, "category": "Intelligence"},
     "expansion": {"name": "Portfolio Expansion", "func": run_expansion_analysis, "category": "Risk & Portfolio"},
+    "playbook": {"name": "Strategy Playbook", "func": run_playbook_update, "category": "Maintenance"},
+    "market_context": {"name": "Market Context", "func": update_market_context, "category": "Intelligence"},
 }
 
 TASK_CRON_MAP = {
@@ -505,6 +509,8 @@ TASK_CRON_MAP = {
     "performance": "PERFORMANCE_CRON",
     "events": "EVENTS_CRON",
     "expansion": "EXPANSION_CRON",
+    "playbook": "PLAYBOOK_CRON",
+    "market_context": "MARKET_CONTEXT_CRON",
 }
 
 
@@ -816,6 +822,33 @@ def get_handoff_summary(limit: int = 3):
     return entries
 
 
+@app.get("/api/playbook")
+def get_playbook():
+    """Return the current strategy playbook content."""
+    try:
+        with open(config.PLAYBOOK_PATH, "r") as f:
+            return {"content": f.read()}
+    except FileNotFoundError:
+        return {"content": "No playbook generated yet. Run the Strategy Playbook agent to generate one."}
+
+
+@app.get("/api/strategy-scores")
+def get_strategy_scores():
+    """Return per-strategy win/loss statistics."""
+    from strategy_tracker import _load_scores
+    return _load_scores()
+
+
+@app.get("/api/market-context")
+def get_market_context():
+    """Return the rolling 30-day market context summary."""
+    try:
+        with open(config.MARKET_CONTEXT_PATH, "r") as f:
+            return {"content": f.read()}
+    except FileNotFoundError:
+        return {"content": "No market context available yet. Run the Market Context agent to generate one."}
+
+
 @app.get("/api/exchange-calendar")
 def get_exchange_calendar_status():
     """Return current exchange session status, holidays, and DST info."""
@@ -849,6 +882,8 @@ def get_config_updated():
         "nikkei_reopen_cron": config.NIKKEI_REOPEN_CRON,
         "ftse_open_cron": config.FTSE_OPEN_CRON,
         "europe_handoff_cron": config.EUROPE_HANDOFF_CRON,
+        "playbook_cron": config.PLAYBOOK_CRON,
+        "market_context_cron": config.MARKET_CONTEXT_CRON,
         "stop_loss_pct": config.STOP_LOSS_PCT,
         "opportunity_pct": config.OPPORTUNITY_PCT,
         "risk_volatility_threshold": config.RISK_VOLATILITY_THRESHOLD,

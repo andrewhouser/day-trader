@@ -1,6 +1,35 @@
 # Changelog
 
-## 2026-04-04
+## 2026-04-04 (intelligence upgrade)
+
+### Added
+- **OBV (On-Balance Volume) trend** added to all instrument technicals — reports ACCUMULATING / DISTRIBUTING / NEUTRAL based on 10-day OBV slope; surface smart-money divergence from price action
+- **VIX term structure** (`fetch_vix_term_structure()`, `get_vix_term_structure_summary()`) — fetches VIX spot and VIX3M, computes spread and classifies as NORMAL / FLAT / MILDLY_INVERTED / INVERTED; injected into every hourly trading prompt
+- **30-day rolling correlation matrix** (`fetch_correlation_matrix()`, `get_correlation_summary()`) — computes pairwise return correlations across all instruments; flags high-correlation pairs (|r| ≥ 0.85) as concentration risk; injected into hourly prompt
+- **`strategy_tracker.py`** — classifies every trade into one of 9 strategy categories (vix_spike_rotation, sector_rotation, momentum_continuation, mean_reversion, sector_divergence, contrarian_breakout, event_catalyst, stop_management, take_profit) using reasoning-text keyword matching; tracks win/loss/neutral counts, win rate, and total P&L per strategy; auto-suspends strategies with ≥10 trades and <35% win rate; suspended strategies flagged in every trading prompt
+- **`playbook_agent.py`** — weekly Playbook Curator agent that reads all trade history and reflections, extracts recurring patterns with empirical win rates, and writes a structured `playbook.md`; the trading agent reads this every cycle as institutional memory; low-sample patterns (3–7 trades) explicitly flagged as hypotheses
+- **`market_context.py`** — rolling 30-day Market Context agent that computes and caches portfolio arc, regime transitions, trade statistics, best/worst instruments, and correlation structure; written to `market_context.md` and injected into every hourly trading prompt
+- **Hypothesis tracking** — all BUY trades now require structured hypothesis fields in the JSON output: `hypothesis` (what must be true), `falsified_by` (what would prove it wrong), `confidence` (High/Medium/Low), `horizon` (expected timeframe); stored in trade_log.md; reflections now explicitly evaluate whether the hypothesis was validated or falsified
+- **Adversarial bear-case debate** — for BUY trades exceeding `BEAR_CASE_THRESHOLD_PCT` (default 5%) of portfolio value, a skeptical risk-analyst agent argues the strongest case against the trade before execution; the bear case is appended to the trade's reasoning in the log so the agent can learn from cases where valid counter-arguments were ignored
+- **Confidence-gated temperature** — `get_adaptive_temperature()` in `playbook_agent.py` returns T=0.1 when high-confidence playbook patterns exist (≥65% win rate, 8+ trades), config default T=0.3 for mixed history, and T=0.6 when no applicable patterns exist (explore more freely in novel market conditions); applied to every hourly LLM call
+- **`call_ollama()` temperature override** — new optional `temperature` parameter allows per-call temperature override while keeping the model-level `think` flag logic intact
+- **New API endpoints**: `GET /api/playbook`, `GET /api/strategy-scores`, `GET /api/market-context`
+- **New agents registered**: `playbook` (Strategy Playbook, Maintenance category), `market_context` (Market Context, Intelligence category)
+- **New scheduled crons**: `PLAYBOOK_CRON` (5:30 AM Fridays), `MARKET_CONTEXT_CRON` (6:55 AM weekdays)
+- **Strategy classification** written to every trade log entry as `- **Strategy:** [category]`
+- **Strategy score ladder** injected into every hourly trading prompt as a markdown table
+
+### Changed
+- Hourly trading prompt expanded with: VIX term structure section, correlation matrix section, rolling 30-day market context section, strategy playbook section, strategy score ladder, suspended strategy warnings
+- OBV trend added to `get_technicals_summary()` output line for each instrument
+- Trading instructions updated to reference OBV divergence, VIX inversion signals, correlation concentration rule, playbook pattern matching, and suspended strategy avoidance
+- Reflection prompts now evaluate hypothesis correctness explicitly (was the hypothesis validated or falsified, and why?)
+- Closed-trade reflections extended from 3–5 sentences to 4–6 sentences to accommodate hypothesis evaluation
+
+### Fixed
+- Disabled Qwen3 thinking mode (`think: false`) for all non-trading-agent LLM calls to prevent timeouts on events and performance agents
+- Added explicit `RESEARCH_TIMEOUT=600` and `EVENTS_TIMEOUT=600` to docker-compose.yml to prevent shell environment from overriding with the shorter `OLLAMA_TIMEOUT` default
+- Risk Alerts on the Risks tab capped at 5 entries (was 30) so the Stress Test section is no longer buried
 
 ### Fixed
 - Fixed technical indicator tooltip bubbles not appearing on hover — tooltip now renders below the header (inside the overflow area) and includes a native `title` fallback

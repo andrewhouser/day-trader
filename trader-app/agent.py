@@ -8,7 +8,13 @@ from datetime import datetime
 import requests
 
 import config
-from market_data import get_market_summary, get_technicals_summary, fetch_technical_indicators
+from market_data import (
+    get_market_summary,
+    get_technicals_summary,
+    fetch_technical_indicators,
+    get_vix_term_structure_summary,
+    get_correlation_summary,
+)
 from regime import detect_regime, get_regime_summary, load_regime
 from position_sizing import get_sizing_summary
 
@@ -28,8 +34,21 @@ def set_current_task_id(task_id: str | None):
     _thread_local.task_id = task_id
 
 
-def call_ollama(prompt: str, system: str = config.SYSTEM_PROMPT, model: str | None = None, timeout: int | None = None) -> str:
-    """Send a prompt to Ollama and return the response text."""
+def call_ollama(
+    prompt: str,
+    system: str = config.SYSTEM_PROMPT,
+    model: str | None = None,
+    timeout: int | None = None,
+    temperature: float | None = None,
+) -> str:
+    """Send a prompt to Ollama and return the response text.
+
+    Args:
+        temperature: Override config.TEMPERATURE for this call.  Used by the
+                     confidence-gated temperature system so the trading agent
+                     explores more freely when no high-confidence playbook
+                     patterns apply.
+    """
     # Check cancellation before the (potentially very long) HTTP call
     task_id = getattr(_thread_local, "task_id", None)
     if task_id:
@@ -42,13 +61,14 @@ def call_ollama(prompt: str, system: str = config.SYSTEM_PROMPT, model: str | No
 
     url = f"{config.OLLAMA_BASE_URL}/api/generate"
     resolved_model = model or config.TRADER_MODEL_NAME
+    resolved_temp = temperature if temperature is not None else config.TEMPERATURE
     payload = {
         "model": resolved_model,
         "prompt": prompt,
         "system": system,
         "stream": False,
         "options": {
-            "temperature": config.TEMPERATURE,
+            "temperature": resolved_temp,
             # Disable Qwen3 extended thinking for non-reasoning tasks; has no
             # effect on other model families (deepseek-r1, llama, phi3, etc.)
             "think": resolved_model == config.TRADER_MODEL_NAME,
@@ -288,6 +308,33 @@ def execute_trade(trade: dict, portfolio: dict, technicals: dict | None = None) 
     if entry_scores:
         scores_line = f"- **Entry Scores:** {json.dumps(entry_scores)}\n"
 
+    # Hypothesis lines (structured trade thesis for later reflection evaluation)
+    hypothesis = trade.get("hypothesis", "")
+    falsified_by = trade.get("falsified_by", "")
+    confidence = trade.get("confidence", "")
+    horizon = trade.get("horizon", "")
+    hyp_lines = ""
+    if hypothesis:
+        hyp_lines += f"- **Hypothesis:** {hypothesis}\n"
+    if falsified_by:
+        hyp_lines += f"- **Falsified By:** {falsified_by}\n"
+    if confidence:
+        hyp_lines += f"- **Confidence:** {confidence}\n"
+    if horizon:
+        hyp_lines += f"- **Horizon:** {horizon}\n"
+
+    # Strategy classification
+    from strategy_tracker import classify_trade_strategy
+    strategy = classify_trade_strategy(reasoning)
+    strategy_line = f"- **Strategy:** {strategy}\n"
+
+    # Update strategy scores for closed SELL trades
+    if action == "SELL" and trade.get("realized_pnl") is not None:
+        from strategy_tracker import update_strategy_scores
+        # Retrieve entry price from position before it was removed
+        entry_price_for_scoring = trade.get("price", price)
+        update_strategy_scores(strategy, trade["realized_pnl"], entry_price_for_scoring, quantity)
+
     log_entry = f"""
 ## {action} - {ticker}
 - **Date:** {now.strftime('%Y-%m-%d %H:%M:%S')}
@@ -296,7 +343,7 @@ def execute_trade(trade: dict, portfolio: dict, technicals: dict | None = None) 
 - **Quantity:** {quantity}
 - **Price:** ${price}
 - **Total:** ${quantity * price:.2f}
-{f'- **Realized P&L:** ${trade.get("realized_pnl", 0):.2f}' if action == 'SELL' else ''}{scores_line}- **Reasoning:** {reasoning}
+{f'- **Realized P&L:** ${trade.get("realized_pnl", 0):.2f}' if action == 'SELL' else ''}{scores_line}{strategy_line}{hyp_lines}- **Reasoning:** {reasoning}
 - **Portfolio Balance:** ${portfolio['total_value_usd']:.2f}
 
 ---
@@ -346,6 +393,73 @@ def _check_stop_loss_and_opportunities(portfolio: dict, instruments: dict) -> li
             })
 
     return alerts
+
+
+def _run_bear_case_debate(trade: dict, market_context_snippet: str) -> tuple[bool, str]:
+    """Run an adversarial bear-case analysis for a proposed trade.
+
+    Called before executing trades whose cost exceeds BEAR_CASE_THRESHOLD_PCT
+    of portfolio value.  The bear-case model argues the strongest case AGAINST
+    the trade; the result is returned so the caller can log it and decide.
+
+    Returns:
+        (proceed: bool, bear_case_text: str)
+        proceed is always True — the final decision is left to the trading agent's
+        original reasoning.  The bear case is logged in the trade entry so the
+        agent can learn from cases where it ignored valid counter-arguments.
+    """
+    ticker = trade.get("ticker", "")
+    action = trade.get("action", "")
+    quantity = trade.get("quantity", 0)
+    price = trade.get("price", 0)
+    reasoning = trade.get("reasoning", "No reasoning provided")
+    hypothesis = trade.get("hypothesis", "")
+
+    bear_prompt = f"""A trading agent has proposed the following trade:
+
+Action: {action}
+Instrument: {ticker}
+Quantity: {quantity} shares @ ${price}
+Cost: ${quantity * price:.2f}
+
+Agent's reasoning:
+{reasoning}
+
+Agent's hypothesis:
+{hypothesis if hypothesis else "No formal hypothesis stated."}
+
+Current market context:
+{market_context_snippet[:800]}
+
+---
+
+Your job is to argue the STRONGEST POSSIBLE CASE AGAINST this trade.  Be specific
+and quantitative.  Do not be contrarian for its own sake — only raise objections
+that are grounded in the data above.
+
+Address:
+1. What technical or fundamental signals contradict the thesis?
+2. What is the most likely failure scenario, and how probable is it?
+3. Is the entry timing poor relative to indicators (RSI stretched, approaching resistance, etc.)?
+4. Does the position add concentration or correlation risk to the existing portfolio?
+5. Is there an upcoming event (earnings, Fed, economic release) that creates asymmetric downside?
+6. What would a prudent risk manager say about this trade?
+
+Be direct.  Rate the strength of the bear case: STRONG / MODERATE / WEAK."""
+
+    logger.info(f"Running bear-case debate for {action} {ticker}...")
+    bear_case = call_ollama(
+        bear_prompt,
+        system=(
+            "You are a skeptical risk analyst whose job is to find flaws in proposed trades. "
+            "You are not trying to be helpful — you are trying to prevent bad trades. "
+            "Be blunt, specific, and grounded in data."
+        ),
+        model=config.RESEARCH_MODEL,
+        timeout=config.OLLAMA_TIMEOUT,
+    )
+    logger.info(f"Bear case received for {ticker} ({len(bear_case)} chars)")
+    return True, bear_case
 
 
 def run_research():
@@ -576,6 +690,11 @@ def run_hourly_check():
     technicals_summary = get_technicals_summary()
     logger.info("Technical indicators computed")
 
+    # 1a. Richer market structure indicators
+    vix_summary = get_vix_term_structure_summary()
+    correlation_summary = get_correlation_summary(lookback_days=30)
+    logger.info("VIX term structure and correlation matrix computed")
+
     # 2. Detect market regime
     regime_data = detect_regime(technicals)
     regime_summary = get_regime_summary()
@@ -605,12 +724,28 @@ def run_hourly_check():
     asia_summary = read_recent_entries(config.NIKKEI_MONITOR_PATH, 2)
     europe_summary = read_recent_entries(config.FTSE_MONITOR_PATH, 2)
 
+    # 3a. Rolling 30-day market context
+    from market_context import get_market_context_for_prompt
+    rolling_context = get_market_context_for_prompt()
+
+    # 3b. Strategy playbook and score ladder
+    from playbook_agent import get_playbook_context
+    from strategy_tracker import get_strategy_ladder, get_suspended_strategies
+    playbook_context = get_playbook_context(max_chars=2500)
+    strategy_ladder = get_strategy_ladder()
+    suspended_strategies = get_suspended_strategies()
+
     # 4. Compute position sizing recommendations
     sizing_summary = get_sizing_summary(technicals, portfolio["total_value_usd"], regime_params)
 
-    # 5. Load quantitative feedback (Improvement #7)
+    # 5. Load quantitative feedback
     from performance_analyst import get_performance_feedback
     perf_feedback = get_performance_feedback()
+
+    # 5a. Confidence-gated temperature — exploit known patterns vs. explore novel ones
+    from playbook_agent import get_adaptive_temperature
+    adaptive_temp = get_adaptive_temperature()
+    logger.info(f"Adaptive temperature: {adaptive_temp} (default: {config.TEMPERATURE})")
 
     # 6. Build prompt
     all_instruments = list(config.INSTRUMENTS.keys())
@@ -628,11 +763,23 @@ def run_hourly_check():
             f"partial_tp_hit={pos.get('take_profit_partial_hit', False)}\n"
         )
 
+    suspended_warning = ""
+    if suspended_strategies:
+        suspended_warning = (
+            f"\n⛔ SUSPENDED STRATEGIES (avoid these — poor empirical results): "
+            + ", ".join(suspended_strategies)
+        )
+
     prompt = f"""Market Check
 
 {market_summary}
 
 {technicals_summary}
+
+### VIX Term Structure
+{vix_summary}
+
+{correlation_summary}
 
 {regime_summary}
 
@@ -650,6 +797,13 @@ def run_hourly_check():
 ```json
 {instrument_details}
 ```
+
+### Rolling 30-Day Market Context
+{rolling_context}
+
+### Strategy Playbook (empirical patterns from trade history)
+{playbook_context}
+{suspended_warning}
 
 ### Recent Trade Log (last 10 entries)
 {recent_trades}
@@ -683,19 +837,24 @@ def run_hourly_check():
 INSTRUCTIONS:
 1. FIRST, carefully read ALL the research notes below. They are produced by your research agent on a frequent cycle and contain the latest market analysis, alerts, and thesis. Do not skip them.
 2. Review the TECHNICAL INDICATORS above. Use moving average alignment, RSI, MACD, and Bollinger Bands to assess trend and momentum for each instrument.
-3. Note the MARKET REGIME ({regime_data.get('regime', 'UNKNOWN')}). Adjust your strategy accordingly:
+   - Also check OBV trend: ACCUMULATING = smart money buying; DISTRIBUTING = smart money selling. A distributing OBV on an up-trending price is a divergence warning.
+3. Check the VIX TERM STRUCTURE. Inversion (VIX > VIX3M) signals acute near-term fear and often precedes sharp bounces. Normal contango = calm. Adjust your risk tolerance accordingly.
+4. Note the MARKET REGIME ({regime_data.get('regime', 'UNKNOWN')}). Adjust your strategy accordingly:
    - {regime_params.get('strategy_note', 'No regime guidance available.')}
-3.5. **SECTOR DIVERGENCE ANALYSIS** — Before scoring any instrument, ask: is it moving WITH the market or AGAINST it?
+4.5. **SECTOR DIVERGENCE ANALYSIS** — Before scoring any instrument, ask: is it moving WITH the market or AGAINST it?
    - Scan the technicals for instruments that are in an uptrend (price > SMA-20, SMA-20 rising) while SPY is in a downtrend, or vice versa.
    - If you find divergence, ask WHY: Is there a supply shock? A geopolitical event? Flight-to-safety demand? Dollar movement? A divergence with an identifiable fundamental driver is a genuine opportunity signal.
    - Classify each diverging instrument as: (a) sustained divergence with driver = candidate for independent scoring; (b) single-session spike without confirmation = noise, discard; (c) divergence but no clear driver = hold, wait for confirmation.
    - Do NOT apply the regime's instrument-type bias (e.g., "avoid cyclicals") to instruments confirmed to be in sustained divergence. Score them on their individual merits.
-4. Review the POSITION SIZING recommendations. These are volatility-scaled — volatile instruments get smaller positions. You may adjust within bounds but justify deviations.
-5. Review the sentiment analysis for qualitative signal from news headlines.
-6. Check the risk alerts — if the risk monitor flagged stop-losses, drawdowns, or volatility, address them explicitly.
-7. Check the economic events calendar — avoid opening new positions ahead of high-impact events unless you have strong conviction.
-8. Review the HISTORICAL PERFORMANCE FEEDBACK. Learn from past patterns — if you tend to sell winners too early or hold losers too long, adjust.
-9. Check STOP-LOSS & TAKE-PROFIT levels for existing positions. Trailing stops are managed automatically, but factor them into your analysis.
+5. Review the POSITION SIZING recommendations. These are volatility-scaled — volatile instruments get smaller positions. You may adjust within bounds but justify deviations.
+5.5. Check the CORRELATION MATRIX. If you plan to hold two highly correlated instruments (r ≥ 0.85), treat them as one position for sizing purposes — you are not diversified.
+6. Review the sentiment analysis for qualitative signal from news headlines.
+7. Check the risk alerts — if the risk monitor flagged stop-losses, drawdowns, or volatility, address them explicitly.
+8. Check the economic events calendar — avoid opening new positions ahead of high-impact events unless you have strong conviction.
+9. Review the HISTORICAL PERFORMANCE FEEDBACK. Learn from past patterns — if you tend to sell winners too early or hold losers too long, adjust.
+9.5. Consult the STRATEGY PLAYBOOK. If a current setup matches a documented pattern with a known win rate, use that as a prior. High-confidence patterns (≥65% win rate, 8+ trades) warrant a stronger signal. Low-sample patterns are hypotheses — treat them accordingly.
+9.6. Check SUSPENDED STRATEGIES. Any strategy flagged ⛔ has empirically failed — do not execute trades that primarily rely on that approach.
+10. Check STOP-LOSS & TAKE-PROFIT levels for existing positions. Trailing stops are managed automatically, but factor them into your analysis.
 
 10. **SCORING FRAMEWORK** — Before making any trade decision, you MUST score each instrument you are considering on these dimensions:
     - **Trend score** (-2 to +2): Based on the instrument's OWN moving average alignment (SMA 20/50/200) and direction — NOT the market's trend. A sector ETF can be in a strong uptrend while SPY is falling; evaluate it on its own chart.
@@ -728,16 +887,23 @@ INSTRUCTIONS:
     - **REGIME BIAS OVERRIDE**: The regime's instrument-type preference (e.g., "favor defensives in downtrend") is a DEFAULT, not a veto. If an instrument scores +1 or +2 on sector divergence AND scores positively on trend and momentum on its own merits, it is eligible for a BUY regardless of its classification as "cyclical." You MUST document the divergence driver explicitly in your trade reasoning.
     - **SPIKE VS. TREND**: A single-session price spike (+5% in one day) without prior multi-session uptrend is NOT a divergence signal — it is noise. Do not buy spikes. Require at least 2-3 sessions of sustained price improvement to confirm divergence.
 
-11. If you decide to make a trade, output it as a JSON block:
+11. If you decide to make a trade, output it as a JSON block with the required hypothesis fields:
 ```json
 {{
   "action": "BUY" or "SELL",
   "ticker": "SPY",
   "quantity": 1,
   "price": 512.40,
-  "reasoning": "Your full reasoning here"
+  "reasoning": "Your full reasoning here",
+  "hypothesis": "What must be true for this trade to work (e.g. 'XLE will rise 3-5% over 3 sessions because crude supply constraint from OPEC cut')",
+  "falsified_by": "What would prove this hypothesis wrong (e.g. 'crude drops below $75 or XLE resumes correlation with SPY decline')",
+  "confidence": "High | Medium | Low",
+  "horizon": "Expected timeframe (e.g. '2-4 sessions', 'intraday', '1-2 weeks')"
 }}
 ```
+
+The hypothesis fields are MANDATORY for all BUY trades. They are used to evaluate the trade after it closes,
+and to build the strategy playbook over time. A trade without a clear hypothesis is a gamble, not a decision.
 
 12. If you decide NOT to trade, explain why clearly. Include what you considered, what almost triggered a trade, and what conditions would change your mind.
 13. You may output multiple trade JSON blocks if you want to make multiple trades.
@@ -754,9 +920,9 @@ The weighted composite is computed by the system — output raw scores only.
 
 Remember: Max position size is regime-adjusted to {regime_params.get('max_position_pct', 0.25) * 100:.0f}% currently. You have ${portfolio['cash_usd']:.2f} in cash and ${portfolio['total_value_usd']:.2f} total portfolio value."""
 
-    # 7. Get LLM decision
-    logger.info("Sending analysis to LLM...")
-    response = call_ollama(prompt)
+    # 7. Get LLM decision (with confidence-gated temperature)
+    logger.info(f"Sending analysis to LLM (temp={adaptive_temp:.2f})...")
+    response = call_ollama(prompt, temperature=adaptive_temp)
     logger.info(f"LLM response received ({len(response)} chars)")
 
     # 7.5. Extract scores from LLM response for trade attribution
@@ -783,21 +949,36 @@ Remember: Max position size is regime-adjusted to {regime_params.get('max_positi
                 trade["entry_scores"] = scores_by_ticker[ticker]
 
             valid, reason = validate_trade(trade, portfolio)
-            if valid:
-                logger.info(
-                    f"Executing trade: {trade['action']} "
-                    f"{trade['quantity']}x {trade['ticker']} @ ${trade['price']}"
-                )
-                portfolio, was_closed = execute_trade(trade, portfolio, technicals)
-                if was_closed:
-                    closed_trades.append(trade)
-            else:
+            if not valid:
                 logger.warning(f"Trade rejected: {reason}")
                 append_to_file(
                     config.TRADE_LOG_PATH,
                     f"\n## Trade Rejected\n- **Reason:** {reason}\n"
                     f"- **Attempted:** {json.dumps(trade)}\n\n---\n",
                 )
+                continue
+
+            # Bear-case adversarial debate for large BUY positions
+            trade_cost = trade.get("quantity", 0) * trade.get("price", 0)
+            bear_threshold = portfolio["total_value_usd"] * (config.BEAR_CASE_THRESHOLD_PCT / 100)
+            bear_case_text = ""
+            if trade.get("action", "").upper() == "BUY" and trade_cost >= bear_threshold:
+                market_snippet = f"{regime_summary}\n{vix_summary}\n{correlation_summary[:400]}"
+                _, bear_case_text = _run_bear_case_debate(trade, market_snippet)
+                # Append bear case to trade reasoning so it is logged and visible
+                trade["reasoning"] = (
+                    trade.get("reasoning", "")
+                    + f"\n\n[BEAR CASE ANALYSIS]\n{bear_case_text}"
+                )
+                logger.info(f"Bear case logged for {ticker} trade (${trade_cost:.2f})")
+
+            logger.info(
+                f"Executing trade: {trade['action']} "
+                f"{trade['quantity']}x {trade['ticker']} @ ${trade['price']}"
+            )
+            portfolio, was_closed = execute_trade(trade, portfolio, technicals)
+            if was_closed:
+                closed_trades.append(trade)
     else:
         # No action taken — log the FULL reasoning
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -810,17 +991,37 @@ Remember: Max position size is regime-adjusted to {regime_params.get('max_positi
         append_to_file(config.TRADE_LOG_PATH, log_entry)
         logger.info("No trades executed this cycle")
 
-    # 9. Write reflections for closed positions (with predicted vs actual comparison)
+    # 9. Write reflections for closed positions (with hypothesis evaluation)
     for trade in closed_trades:
+        hypothesis = trade.get("hypothesis", "")
+        falsified_by = trade.get("falsified_by", "")
+        pnl = trade.get("realized_pnl", 0)
+        outcome = "WON" if pnl > 0.01 else ("LOST" if pnl < -0.01 else "NEUTRAL")
+
+        hyp_block = ""
+        if hypothesis:
+            hyp_block = f"""
+- Stated Hypothesis: {hypothesis}
+- Falsified By condition: {falsified_by if falsified_by else "Not stated"}
+- Outcome: {outcome} (${pnl:+.2f})
+
+CRITICAL QUESTION: Was the hypothesis correct, partially correct, or wrong?
+If wrong, what specifically invalidated it — did the falsification condition trigger, or did
+something else happen that the hypothesis didn't account for?
+"""
+
         reflection_prompt = f"""You just closed a trade:
 - Sold {trade['quantity']}x {trade['ticker']} at ${trade['price']}
-- Realized P&L: ${trade.get('realized_pnl', 0):.2f}
-- Original reasoning: {trade.get('reasoning', 'N/A')}
+- Realized P&L: ${pnl:.2f} ({outcome})
+- Original reasoning: {trade.get('reasoning', 'N/A')[:500]}
+{hyp_block}
+Write a reflection covering:
+1. Was the hypothesis validated or falsified, and why?
+2. What worked or failed in the execution (entry timing, sizing, exit)?
+3. One concrete change to apply next time this setup appears.
 
-Write a reflection: What worked? What didn't? What will you do differently?
-Compare your predicted outcome (from the original reasoning) vs the actual outcome.
-Be specific about the entry timing, exit timing, and whether your thesis played out.
-Keep it to 3-5 sentences."""
+Be specific. Reference actual price levels and indicator values where possible.
+Keep it to 4-6 sentences."""
 
         reflection = call_ollama(reflection_prompt)
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")

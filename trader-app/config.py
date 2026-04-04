@@ -26,6 +26,8 @@ REBALANCER_CRON = os.getenv("REBALANCER_CRON", "0 6 * * 1")  # 6 AM every Monday
 PERFORMANCE_CRON = os.getenv("PERFORMANCE_CRON", "0 6 * * 5")  # 6 AM every Friday
 EVENTS_CRON = os.getenv("EVENTS_CRON", "0 6 * * 1-5")  # 6 AM weekdays
 EXPANSION_CRON = os.getenv("EXPANSION_CRON", "0 7 * * 3")  # 7 AM every Wednesday
+PLAYBOOK_CRON = os.getenv("PLAYBOOK_CRON", "30 5 * * 5")  # 5:30 AM every Friday (after performance, before market open)
+MARKET_CONTEXT_CRON = os.getenv("MARKET_CONTEXT_CRON", "55 6 * * 1-5")  # 6:55 AM weekdays (just before market open)
 
 # ── Overseas market monitor schedules (all times in TIMEZONE / ET) ──
 # Nikkei / Tokyo Stock Exchange
@@ -48,6 +50,16 @@ EUROPE_HANDOFF_CRON = os.getenv("EUROPE_HANDOFF_CRON", "30 5 * * 1-5")  # 5:30 A
 # Overseas monitor model (defaults to RESEARCH_MODEL for analysis quality)
 OVERSEAS_MODEL = os.getenv("OVERSEAS_MODEL", "")  # Empty = use RESEARCH_MODEL
 OVERSEAS_TIMEOUT = int(os.getenv("OVERSEAS_TIMEOUT", "600"))
+PLAYBOOK_MODEL = os.getenv("PLAYBOOK_MODEL", "")   # Empty = use RESEARCH_MODEL
+PLAYBOOK_TIMEOUT = int(os.getenv("PLAYBOOK_TIMEOUT", "600"))
+
+# Adversarial bear-case debate: minimum position size (% of portfolio) to trigger
+BEAR_CASE_THRESHOLD_PCT = float(os.getenv("BEAR_CASE_THRESHOLD_PCT", "5.0"))
+# Confidence-gated temperature thresholds
+PLAYBOOK_HIGH_CONFIDENCE_WIN_RATE = float(os.getenv("PLAYBOOK_HIGH_CONFIDENCE_WIN_RATE", "0.65"))  # ≥65% win rate → low temp
+PLAYBOOK_HIGH_CONFIDENCE_MIN_TRADES = int(os.getenv("PLAYBOOK_HIGH_CONFIDENCE_MIN_TRADES", "8"))   # Minimum samples required
+TEMPERATURE_HIGH_CONFIDENCE = float(os.getenv("TEMPERATURE_HIGH_CONFIDENCE", "0.1"))
+TEMPERATURE_NO_PATTERN = float(os.getenv("TEMPERATURE_NO_PATTERN", "0.6"))
 
 TIMEZONE = os.getenv("TZ", "America/New_York")
 
@@ -69,6 +81,9 @@ PORTFOLIO_HISTORY_PATH = os.path.join(DATA_DIR, "portfolio_history.json")
 MARKET_RESEARCH_PATH = os.path.join(DATA_DIR, "market_research.json")
 MARKET_BRIEF_PATH = os.path.join(DATA_DIR, "market_brief.md")
 TASK_HISTORY_PATH = os.path.join(DATA_DIR, "task_history.json")
+PLAYBOOK_PATH = os.path.join(DATA_DIR, "playbook.md")
+MARKET_CONTEXT_PATH = os.path.join(DATA_DIR, "market_context.md")
+STRATEGY_SCORES_PATH = os.path.join(DATA_DIR, "strategy_scores.json")
 
 # Overseas market monitor output files
 NIKKEI_MONITOR_PATH = os.path.join(DATA_DIR, "nikkei_monitor.md")

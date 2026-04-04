@@ -366,6 +366,21 @@ def fetch_technical_indicators() -> dict:
             else:
                 indicators["volume_ratio"] = None
 
+            # On-Balance Volume (OBV) trend
+            # OBV accumulates volume: +vol on up days, -vol on down days.
+            # We report the 10-day slope sign as ACCUMULATING / DISTRIBUTING / NEUTRAL.
+            if len(close) >= 11:
+                obv = (np.sign(close.diff()).fillna(0) * volume).cumsum()
+                obv_slope = obv.iloc[-1] - obv.iloc[-10]
+                if obv_slope > 0:
+                    indicators["obv_trend"] = "ACCUMULATING"
+                elif obv_slope < 0:
+                    indicators["obv_trend"] = "DISTRIBUTING"
+                else:
+                    indicators["obv_trend"] = "NEUTRAL"
+            else:
+                indicators["obv_trend"] = None
+
             indicators["price"] = round(float(close.iloc[-1]), 2)
 
             if len(close) >= 20:
@@ -414,11 +429,144 @@ def get_technicals_summary() -> str:
             else:
                 trend = "MIXED"
 
+        obv_trend = data.get("obv_trend", "N/A")
         lines.append(
             f"- {ticker} @ ${price} | SMA 20/50/200: {sma20}/{sma50}/{sma200} | "
             f"Trend: {trend} | RSI: {rsi} | MACD Hist: {macd_h} | "
             f"ATR: {atr} | BB: [{bb_lower}-{bb_upper}] | "
-            f"Vol Ratio: {vol_ratio} | ROC(20d): {roc}%"
+            f"Vol Ratio: {vol_ratio} | ROC(20d): {roc}% | OBV: {obv_trend}"
         )
 
+    return "\n".join(lines)
+
+
+def fetch_vix_term_structure() -> dict:
+    """Fetch VIX spot and 3-month VIX futures (VIX3M) to assess vol term structure.
+
+    A normal (upward-sloping) term structure has VIX3M > VIX.
+    Inversion (VIX > VIX3M) signals acute near-term stress — historically
+    associated with sharp selling and mean-reversion bounces.
+    """
+    result = {"vix": None, "vix3m": None, "spread": None, "structure": "unknown"}
+    try:
+        vix_ticker = yf.Ticker("^VIX")
+        vix_hist = vix_ticker.history(period="2d")
+        if not vix_hist.empty:
+            result["vix"] = round(float(vix_hist["Close"].iloc[-1]), 2)
+    except Exception as exc:
+        logger.debug(f"VIX fetch error: {exc}")
+
+    try:
+        vix3m_ticker = yf.Ticker("^VIX3M")
+        vix3m_hist = vix3m_ticker.history(period="2d")
+        if not vix3m_hist.empty:
+            result["vix3m"] = round(float(vix3m_hist["Close"].iloc[-1]), 2)
+    except Exception as exc:
+        logger.debug(f"VIX3M fetch error: {exc}")
+
+    if result["vix"] is not None and result["vix3m"] is not None:
+        spread = round(result["vix3m"] - result["vix"], 2)
+        result["spread"] = spread
+        if spread > 2:
+            result["structure"] = "NORMAL"       # calm, contango
+        elif spread >= 0:
+            result["structure"] = "FLAT"          # mild compression
+        elif spread >= -3:
+            result["structure"] = "MILDLY_INVERTED"   # elevated near-term fear
+        else:
+            result["structure"] = "INVERTED"      # acute stress / capitulation zone
+
+    return result
+
+
+def get_vix_term_structure_summary() -> str:
+    """Return a one-line VIX term structure summary for the trading prompt."""
+    ts = fetch_vix_term_structure()
+    vix = ts.get("vix", "N/A")
+    vix3m = ts.get("vix3m", "N/A")
+    spread = ts.get("spread", "N/A")
+    structure = ts.get("structure", "unknown")
+
+    interpretation = {
+        "NORMAL": "calm — elevated VIX3M implies market expects low near-term vol",
+        "FLAT": "transitional — term structure compressing, watch for change",
+        "MILDLY_INVERTED": "near-term stress elevated — protective positioning warranted",
+        "INVERTED": "acute fear — near-term vol > long-term; historically a mean-reversion signal near capitulation",
+        "unknown": "data unavailable",
+    }.get(structure, "")
+
+    return (
+        f"VIX: {vix} | VIX3M: {vix3m} | Spread (3M−spot): {spread} | "
+        f"Structure: {structure} — {interpretation}"
+    )
+
+
+def fetch_correlation_matrix(lookback_days: int = 30) -> dict:
+    """Compute a rolling correlation matrix across all tradeable instruments.
+
+    Returns a dict with:
+      - matrix: {ticker: {other_ticker: correlation}} for all pairs
+      - high_correlation_pairs: list of (ticker_a, ticker_b, corr) where |corr| >= 0.85
+      - summary_lines: list of human-readable strings for the prompt
+    """
+    tickers = list(config.INSTRUMENTS.keys())
+    close_data: dict[str, pd.Series] = {}
+
+    for sym in tickers:
+        try:
+            hist = yf.Ticker(sym).history(period=f"{lookback_days + 5}d")
+            if not hist.empty:
+                close_data[sym] = hist["Close"].rename(sym)
+        except Exception as exc:
+            logger.debug(f"Correlation fetch error for {sym}: {exc}")
+
+    if len(close_data) < 2:
+        return {"matrix": {}, "high_correlation_pairs": [], "summary_lines": ["Insufficient data for correlation matrix."]}
+
+    df = pd.DataFrame(close_data).dropna(how="all")
+    df = df.iloc[-lookback_days:]   # use last N days
+    returns = df.pct_change().dropna()
+
+    if len(returns) < 5:
+        return {"matrix": {}, "high_correlation_pairs": [], "summary_lines": ["Insufficient return history for correlation."]}
+
+    corr = returns.corr()
+
+    matrix: dict[str, dict[str, float]] = {}
+    high_pairs: list[tuple[str, str, float]] = []
+
+    seen = set()
+    for a in corr.index:
+        matrix[a] = {}
+        for b in corr.columns:
+            if a == b:
+                continue
+            val = round(float(corr.loc[a, b]), 2) if pd.notna(corr.loc[a, b]) else None
+            matrix[a][b] = val
+            key = tuple(sorted([a, b]))
+            if key not in seen and val is not None and abs(val) >= config.RISK_CORRELATION_THRESHOLD:
+                high_pairs.append((a, b, val))
+                seen.add(key)
+
+    high_pairs.sort(key=lambda x: abs(x[2]), reverse=True)
+
+    summary_lines = []
+    if high_pairs:
+        summary_lines.append(
+            f"High-correlation pairs (|r| ≥ {config.RISK_CORRELATION_THRESHOLD}, last {lookback_days}d):"
+        )
+        for a, b, c in high_pairs[:10]:
+            direction = "positive" if c > 0 else "negative"
+            summary_lines.append(f"  {a}↔{b}: r={c:+.2f} ({direction}) — concentrated risk if both held")
+    else:
+        summary_lines.append(f"No pairs exceed the r={config.RISK_CORRELATION_THRESHOLD} correlation threshold (last {lookback_days}d).")
+
+    return {"matrix": matrix, "high_correlation_pairs": high_pairs, "summary_lines": summary_lines}
+
+
+def get_correlation_summary(lookback_days: int = 30) -> str:
+    """Return a human-readable correlation summary for the trading prompt."""
+    result = fetch_correlation_matrix(lookback_days)
+    lines = [f"\n### Portfolio Correlation Matrix ({lookback_days}-day rolling)\n"]
+    lines.extend(result["summary_lines"])
     return "\n".join(lines)
