@@ -75,7 +75,7 @@ def call_ollama(
         },
     }
     try:
-        resp = requests.post(url, json=payload, timeout=timeout or config.OLLAMA_TIMEOUT)
+        resp = requests.post(url, json=payload, timeout=timeout if timeout is not None else config.OLLAMA_TIMEOUT)
         resp.raise_for_status()
         return resp.json().get("response", "")
     except requests.exceptions.RequestException as e:
@@ -281,6 +281,9 @@ def execute_trade(trade: dict, portfolio: dict, technicals: dict | None = None) 
 
                 realized_pnl = round((price - pos["entry_price"]) * quantity, 2)
                 trade["realized_pnl"] = realized_pnl
+                # Stash the original entry price so strategy scoring has the
+                # correct cost basis after the position is removed from the list.
+                trade["_entry_price"] = pos["entry_price"]
 
                 if quantity >= pos["quantity"]:
                     portfolio["positions"].pop(i)
@@ -331,8 +334,8 @@ def execute_trade(trade: dict, portfolio: dict, technicals: dict | None = None) 
     # Update strategy scores for closed SELL trades
     if action == "SELL" and trade.get("realized_pnl") is not None:
         from strategy_tracker import update_strategy_scores
-        # Retrieve entry price from position before it was removed
-        entry_price_for_scoring = trade.get("price", price)
+        # Use _entry_price stashed in the SELL branch above — NOT the sell price.
+        entry_price_for_scoring = trade.get("_entry_price", price)
         update_strategy_scores(strategy, trade["realized_pnl"], entry_price_for_scoring, quantity)
 
     log_entry = f"""

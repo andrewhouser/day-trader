@@ -27,7 +27,7 @@ services:
       - PERFORMANCE_CRON=0 6 * * 5
       - EVENTS_CRON=0 6 * * 1-5
       - EXPANSION_CRON=0 7 * * 3
-      - PLAYBOOK_CRON=30 5 * * 5
+      - PLAYBOOK_CRON=30 6 * * 5
       - MARKET_CONTEXT_CRON=55 6 * * 1-5
       - BEAR_CASE_THRESHOLD_PCT=5.0
       - PLAYBOOK_HIGH_CONFIDENCE_WIN_RATE=0.65

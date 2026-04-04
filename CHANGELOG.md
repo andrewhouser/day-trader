@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-04-04 (review fixes)
+
+### Fixed
+- **Bug: strategy scorer received sell price instead of entry price** — `execute_trade()` now stashes `pos["entry_price"]` as `trade["_entry_price"]` in the SELL branch before the position is removed from the list; `update_strategy_scores()` receives the correct cost basis so win/loss P&L percentages are accurate
+- **Bug: `PLAYBOOK_CRON` ran before `PERFORMANCE_CRON` on Fridays** — moved from 5:30 AM to 6:30 AM so the playbook curator always reads the freshly-generated performance analysis from that morning (both config.py default and docker-compose.yml updated)
+- **Bug: `timeout or config.OLLAMA_TIMEOUT` evaluates to 300 when timeout=0** — replaced `or` fallback with explicit `None` check (`timeout if timeout is not None else config.OLLAMA_TIMEOUT`) in `call_ollama()`; prevents any zero-valued env var from silently falling through to the shorter default timeout
+- **Performance reports still show `read timeout=300`** — root cause is the running container predates the `think: false` and `RESEARCH_TIMEOUT=600` changes; requires `docker compose up -d --build` to deploy; old `[ERROR]` entries in `performance.md` persist until a successful run pushes them out of the top-5 view
+- **Scheduler missing new agents** — `playbook` and `market_context` were registered in the API task registry but absent from `scheduler.py` JOBS list; they appeared in the Tasks UI but never fired automatically (fixed in previous commit `8416b02`)
+
 ## 2026-04-04 (intelligence upgrade)
 
 ### Added

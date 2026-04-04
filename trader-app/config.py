@@ -26,7 +26,7 @@ REBALANCER_CRON = os.getenv("REBALANCER_CRON", "0 6 * * 1")  # 6 AM every Monday
 PERFORMANCE_CRON = os.getenv("PERFORMANCE_CRON", "0 6 * * 5")  # 6 AM every Friday
 EVENTS_CRON = os.getenv("EVENTS_CRON", "0 6 * * 1-5")  # 6 AM weekdays
 EXPANSION_CRON = os.getenv("EXPANSION_CRON", "0 7 * * 3")  # 7 AM every Wednesday
-PLAYBOOK_CRON = os.getenv("PLAYBOOK_CRON", "30 5 * * 5")  # 5:30 AM every Friday (after performance, before market open)
+PLAYBOOK_CRON = os.getenv("PLAYBOOK_CRON", "30 6 * * 5")  # 6:30 AM every Friday (after Performance Analysis at 6 AM)
 MARKET_CONTEXT_CRON = os.getenv("MARKET_CONTEXT_CRON", "55 6 * * 1-5")  # 6:55 AM weekdays (just before market open)
 
 # ── Overseas market monitor schedules (all times in TIMEZONE / ET) ──
