@@ -595,6 +595,12 @@ def run_hourly_check():
         events_calendar = ""
     recent_risk_alerts = read_recent_entries(config.RISK_ALERTS_PATH, 5)
 
+    # Read overseas monitor summaries for cross-market context
+    # Prefer the consolidated handoff summary when available
+    handoff_summary = read_recent_entries(config.HANDOFF_SUMMARY_PATH, 1)
+    asia_summary = read_recent_entries(config.NIKKEI_MONITOR_PATH, 2)
+    europe_summary = read_recent_entries(config.FTSE_MONITOR_PATH, 2)
+
     # 4. Compute position sizing recommendations
     sizing_summary = get_sizing_summary(technicals, portfolio["total_value_usd"], regime_params)
 
@@ -658,6 +664,12 @@ def run_hourly_check():
 
 ### Economic Events Calendar
 {events_calendar if events_calendar else "No events calendar available yet."}
+
+### Asia Overnight Summary (Nikkei / Tokyo)
+{handoff_summary if handoff_summary.strip() else (asia_summary if asia_summary.strip() else "No Asia data available.")}
+
+### Europe-at-Open Summary (FTSE / London)
+{europe_summary if europe_summary.strip() and not handoff_summary.strip() else ("See handoff summary above." if handoff_summary.strip() else "No Europe data available.")}
 
 ### Historical Performance Feedback
 {perf_feedback}
@@ -849,7 +861,12 @@ Focus on: What did you observe? Was there anything surprising? What will you wat
 
 
 def run_morning_report():
-    """Generate the daily morning report."""
+    """Generate the daily morning report.
+
+    Now includes Asia overnight and Europe-at-open summaries from the
+    overseas monitors, providing a full follow-the-sun context before
+    the U.S. session begins.
+    """
     logger.info("Generating morning report...")
 
     portfolio = load_portfolio()
@@ -857,6 +874,22 @@ def run_morning_report():
     recent_reflections = read_recent_entries(config.REFLECTIONS_PATH, 10)
     recent_research = read_recent_entries(config.RESEARCH_PATH, 3)
     market_summary = get_market_summary()
+
+    # Read overseas monitor summaries — prefer the consolidated handoff
+    # summary when available, fall back to raw Asia + Europe feeds
+    handoff_summary = read_recent_entries(config.HANDOFF_SUMMARY_PATH, 1)
+    asia_summary = read_recent_entries(config.NIKKEI_MONITOR_PATH, 3)
+    europe_summary = read_recent_entries(config.FTSE_MONITOR_PATH, 3)
+
+    if handoff_summary.strip():
+        overseas_block = f"""### Overnight Handoff Summary (consolidated Asia + Europe)
+{handoff_summary}"""
+    else:
+        overseas_block = f"""### Asia Overnight Summary (Nikkei / Tokyo)
+{asia_summary if asia_summary.strip() else "No Asia data available — monitors may not have run yet."}
+
+### Europe-at-Open Summary (FTSE / London)
+{europe_summary if europe_summary.strip() else "No Europe data available — monitors may not have run yet."}"""
 
     gain_loss = portfolio["total_value_usd"] - portfolio["starting_capital"]
     pct_return = (gain_loss / portfolio["starting_capital"]) * 100
@@ -879,6 +912,8 @@ Generate a daily trading report. Today is {datetime.now().strftime('%Y-%m-%d')}.
 - All-Time Low: ${portfolio['all_time_low']:.2f}
 - Total Trades: {portfolio['trade_count']}
 
+{overseas_block}
+
 ### Recent Trade Log
 {recent_trades}
 
@@ -896,10 +931,13 @@ Generate a daily trading report. Today is {datetime.now().strftime('%Y-%m-%d')}.
 Write the full morning report with these sections:
 1. Portfolio Summary (cash, total value, gain/loss, % return)
 2. Open Positions (ticker, entry price, current price, quantity, unrealized P&L, rationale)
-3. Trades Made Yesterday (summary of last 24h trades with reasoning)
-4. Performance Reflection (what went well, what didn't, one thing to change today)
-5. Market Outlook (your read on U.S. and international conditions, what you're watching)
-6. Research Summary (key findings from your latest research notes)
+3. Asia Overnight Recap (Nikkei direction, key themes, divergence from prior U.S. close)
+4. Europe-at-Open Recap (FTSE direction, key themes, Asia-to-Europe handoff)
+5. Cross-Market Handoff Summary (what Asia and Europe are telling us about the U.S. day ahead, key risks and catalysts)
+6. Trades Made Yesterday (summary of last 24h trades with reasoning)
+7. Performance Reflection (what went well, what didn't, one thing to change today)
+8. Market Outlook (your read on global conditions — Asia, Europe, U.S. — and what you're watching)
+9. Research Summary (key findings from your latest research notes)
 
 Be specific and honest. Do not omit trades or rationalize poor decisions."""
 

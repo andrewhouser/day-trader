@@ -35,6 +35,7 @@ from rebalancer import run_rebalancer
 from performance_analyst import run_performance_analysis
 from events_agent import run_events_calendar
 from regime import detect_regime, load_regime
+from overseas_monitors import run_nikkei_open, run_nikkei_reopen, run_ftse_open, run_europe_handoff
 
 logger = logging.getLogger(__name__)
 
@@ -471,6 +472,11 @@ def get_report(filename: str):
 # ── Task Management ────────────────────────────────────────
 
 TASK_REGISTRY = {
+    "nikkei_open": {"name": "Nikkei Open Monitor", "func": run_nikkei_open},
+    "nikkei_reopen": {"name": "Nikkei Reopen Monitor", "func": run_nikkei_reopen},
+    "nikkei_reopen_late": {"name": "Nikkei Reopen Monitor (late)", "func": run_nikkei_reopen},
+    "ftse_open": {"name": "FTSE Open Monitor", "func": run_ftse_open},
+    "europe_handoff": {"name": "Europe Handoff Summary", "func": run_europe_handoff},
     "research": {"name": "Market Research", "func": run_research},
     "hourly_check": {"name": "Market Check", "func": run_hourly_check},
     "morning_report": {"name": "Morning Report", "func": run_morning_report},
@@ -484,6 +490,11 @@ TASK_REGISTRY = {
 }
 
 TASK_CRON_MAP = {
+    "nikkei_open": "NIKKEI_OPEN_CRON",
+    "nikkei_reopen": "NIKKEI_REOPEN_CRON",
+    "nikkei_reopen_late": "NIKKEI_REOPEN_LATE_CRON",
+    "ftse_open": "FTSE_OPEN_CRON",
+    "europe_handoff": "EUROPE_HANDOFF_CRON",
     "research": "RESEARCH_CRON",
     "hourly_check": "HOURLY_CRON",
     "morning_report": "MORNING_REPORT_CRON",
@@ -762,6 +773,55 @@ def get_events():
         return {"content": "No events calendar generated yet."}
 
 
+@app.get("/api/overseas/nikkei")
+def get_nikkei_monitor(limit: int = 5):
+    """Return recent Nikkei monitor entries."""
+    raw = read_recent_entries(config.NIKKEI_MONITOR_PATH, limit)
+    sections = raw.split("\n---\n")
+    entries = []
+    for section in sections[1:]:
+        section = section.strip()
+        if section:
+            entries.append({"raw": section})
+    entries.reverse()
+    return entries
+
+
+@app.get("/api/overseas/ftse")
+def get_ftse_monitor(limit: int = 5):
+    """Return recent FTSE monitor entries."""
+    raw = read_recent_entries(config.FTSE_MONITOR_PATH, limit)
+    sections = raw.split("\n---\n")
+    entries = []
+    for section in sections[1:]:
+        section = section.strip()
+        if section:
+            entries.append({"raw": section})
+    entries.reverse()
+    return entries
+
+
+@app.get("/api/overseas/handoff")
+def get_handoff_summary(limit: int = 3):
+    """Return recent Europe Handoff Summary entries."""
+    raw = read_recent_entries(config.HANDOFF_SUMMARY_PATH, limit)
+    sections = raw.split("\n---\n")
+    entries = []
+    for section in sections[1:]:
+        section = section.strip()
+        if section:
+            entries.append({"raw": section})
+    entries.reverse()
+    return entries
+
+
+@app.get("/api/exchange-calendar")
+def get_exchange_calendar_status():
+    """Return current exchange session status, holidays, and DST info."""
+    from exchange_calendar import get_current_session_info
+    return get_current_session_info()
+
+
 @app.get("/api/config")
 def get_config_updated():
     """Return current agent configuration (non-sensitive)."""
@@ -784,6 +844,10 @@ def get_config_updated():
         "rebalancer_cron": config.REBALANCER_CRON,
         "performance_cron": config.PERFORMANCE_CRON,
         "events_cron": config.EVENTS_CRON,
+        "nikkei_open_cron": config.NIKKEI_OPEN_CRON,
+        "nikkei_reopen_cron": config.NIKKEI_REOPEN_CRON,
+        "ftse_open_cron": config.FTSE_OPEN_CRON,
+        "europe_handoff_cron": config.EUROPE_HANDOFF_CRON,
         "stop_loss_pct": config.STOP_LOSS_PCT,
         "opportunity_pct": config.OPPORTUNITY_PCT,
         "risk_volatility_threshold": config.RISK_VOLATILITY_THRESHOLD,
@@ -1030,6 +1094,21 @@ def _build_chat_context() -> str:
             events = f.read()[:2000]
         if events.strip():
             sections.append(f"### Upcoming Events\n{events}")
+    except Exception:
+        pass
+
+    # Overseas market summaries
+    try:
+        handoff = read_recent_entries(config.HANDOFF_SUMMARY_PATH, 1)
+        if handoff.strip():
+            sections.append(f"### Overnight Handoff Summary\n{handoff}")
+        else:
+            asia = read_recent_entries(config.NIKKEI_MONITOR_PATH, 2)
+            if asia.strip():
+                sections.append(f"### Asia Overnight (Nikkei)\n{asia}")
+            europe = read_recent_entries(config.FTSE_MONITOR_PATH, 2)
+            if europe.strip():
+                sections.append(f"### Europe at Open (FTSE)\n{europe}")
     except Exception:
         pass
 

@@ -2,9 +2,29 @@
 
 ## 2026-04-03
 
+### Added
+- Overseas market monitoring: Nikkei Open Monitor (Tokyo morning session, 7–10:30 PM ET Sun–Thu), Nikkei Reopen Monitor (Tokyo afternoon / Asia continuation, 11 PM–2:30 AM ET), and FTSE Open Monitor (London open, 2:30–5:30 AM ET Mon–Fri)
+- New `overseas_monitors.py` module with `run_nikkei_open()`, `run_nikkei_reopen()`, and `run_ftse_open()` agents following the existing agent pattern
+- Follow-the-sun workflow: Asia → Europe → U.S. agents run in sequence; downstream agents consume upstream summaries via file-based handoff
+- Europe Handoff Summary agent (`run_europe_handoff()`) — runs at 5:30 AM ET Mon–Fri, synthesizes full Asia + Europe overnight data into a single consolidated pre-market brief; downstream agents (Morning Report, Market Check, Chat) prefer the handoff summary when available, falling back to raw feeds
+- Exchange calendar and DST utility module (`exchange_calendar.py`) — holiday calendars for JPX, LSE, and NYSE (2026–2027); `is_exchange_open()` / `is_exchange_holiday()` helpers; DST-offset computation (`get_et_offset_to()`, `is_dst_transition_week()`, `get_schedule_drift_warning()`); `get_current_session_info()` for API status
+- Overseas monitors now skip runs on exchange holidays (JPX for Nikkei, LSE for FTSE) and log DST drift warnings when U.S. or UK transitions are within ±7 days
+- Morning Report now includes Asia Overnight Recap, Europe-at-Open Recap, and Cross-Market Handoff Summary sections
+- Market Check now ingests Nikkei and FTSE monitor summaries as cross-market context for trading decisions
+- Risk Monitor now reads overseas summaries (preferring handoff) and logs exchange open/closed status and DST drift
+- Chat context now includes overseas data (preferring handoff summary)
+- API endpoints: `GET /api/overseas/nikkei`, `GET /api/overseas/ftse`, `GET /api/overseas/handoff`, `GET /api/exchange-calendar`
+- Config entries: `NIKKEI_OPEN_CRON`, `NIKKEI_REOPEN_CRON`, `NIKKEI_REOPEN_LATE_CRON`, `FTSE_OPEN_CRON`, `EUROPE_HANDOFF_CRON`, `OVERSEAS_MODEL`, `OVERSEAS_TIMEOUT`
+- File paths: `nikkei_monitor.md`, `ftse_monitor.md`, `handoff_summary.md` in the data directory
+
 ### Changed
 - Expansion proposals list now sorts pending items to the top, then by newest first
 - Nav bar shows a yellow dot indicator next to "Expansion" when pending proposals are available (polled every 60s)
+- Scheduler JOBS list reordered to reflect follow-the-sun execution order (overseas → pre-market → market hours → weekly)
+- Morning Report prompt expanded from 6 sections to 9 sections including global market context
+
+### Fixed
+- Fixed performance analyst timing out — now passes `RESEARCH_TIMEOUT` (600s) to `call_ollama` instead of defaulting to 300s
 
 ### Fixed
 - Fixed events calendar agent timing out during research — switched `EVENTS_MODEL` from `qwen3.5:latest` to `qwen2.5:7b` (faster for structured generation) and added configurable `EVENTS_TIMEOUT` (default 600s)

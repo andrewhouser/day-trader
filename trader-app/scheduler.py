@@ -22,6 +22,7 @@ from rebalancer import run_rebalancer
 from performance_analyst import run_performance_analysis
 from events_agent import run_events_calendar
 from expansion import run_expansion_analysis, load_approved_into_config
+from overseas_monitors import run_nikkei_open, run_nikkei_reopen, run_ftse_open, run_europe_handoff
 
 logging.basicConfig(
     level=logging.INFO,
@@ -120,15 +121,24 @@ def _tracked(task_id: str, task_name: str, func):
 
 
 JOBS = [
+    # ── Overseas monitors (follow-the-sun: Asia → Europe → U.S.) ──
+    ("nikkei_open", "Nikkei Open Monitor", run_nikkei_open, "NIKKEI_OPEN_CRON", 300),
+    ("nikkei_reopen", "Nikkei Reopen Monitor", run_nikkei_reopen, "NIKKEI_REOPEN_CRON", 300),
+    ("nikkei_reopen_late", "Nikkei Reopen Monitor (late)", run_nikkei_reopen, "NIKKEI_REOPEN_LATE_CRON", 300),
+    ("ftse_open", "FTSE Open Monitor", run_ftse_open, "FTSE_OPEN_CRON", 300),
+    ("europe_handoff", "Europe Handoff Summary", run_europe_handoff, "EUROPE_HANDOFF_CRON", 600),
+    # ── U.S. pre-market ──
+    ("compaction", "Memory Compaction", run_compaction, "COMPACTION_CRON", 600),
+    ("events", "Events Calendar", run_events_calendar, "EVENTS_CRON", 600),
+    ("morning_report", "Morning Report", run_morning_report, "MORNING_REPORT_CRON", 600),
+    # ── U.S. market hours ──
     ("research", "Market Research", run_research, "RESEARCH_CRON", 300),
     ("hourly_check", "Market Check", run_hourly_check, "HOURLY_CRON", 300),
-    ("morning_report", "Morning Report", run_morning_report, "MORNING_REPORT_CRON", 600),
-    ("compaction", "Memory Compaction", run_compaction, "COMPACTION_CRON", 600),
     ("sentiment", "Sentiment Analysis", run_sentiment, "SENTIMENT_CRON", 300),
     ("risk_monitor", "Risk Monitor", run_risk_monitor, "RISK_MONITOR_CRON", 60),
+    # ── Weekly / periodic ──
     ("rebalancer", "Portfolio Rebalancer", run_rebalancer, "REBALANCER_CRON", 600),
     ("performance", "Performance Analysis", run_performance_analysis, "PERFORMANCE_CRON", 600),
-    ("events", "Events Calendar", run_events_calendar, "EVENTS_CRON", 600),
     ("expansion", "Portfolio Expansion", run_expansion_analysis, "EXPANSION_CRON", 600),
 ]
 

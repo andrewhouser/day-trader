@@ -295,7 +295,7 @@ Produce a comprehensive performance report with these sections:
 Be quantitative. Use the actual numbers. Don't be vague."""
 
     logger.info("Sending performance analysis prompt to LLM...")
-    response = call_ollama(prompt, system=PERFORMANCE_SYSTEM, model=config.RESEARCH_MODEL)
+    response = call_ollama(prompt, system=PERFORMANCE_SYSTEM, model=config.RESEARCH_MODEL, timeout=config.RESEARCH_TIMEOUT)
     logger.info(f"Performance analysis received ({len(response)} chars)")
 
     now = datetime.now()

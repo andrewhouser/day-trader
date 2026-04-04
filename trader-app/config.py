@@ -26,6 +26,29 @@ REBALANCER_CRON = os.getenv("REBALANCER_CRON", "0 6 * * 1")  # 6 AM every Monday
 PERFORMANCE_CRON = os.getenv("PERFORMANCE_CRON", "0 6 * * 5")  # 6 AM every Friday
 EVENTS_CRON = os.getenv("EVENTS_CRON", "0 6 * * 1-5")  # 6 AM weekdays
 EXPANSION_CRON = os.getenv("EXPANSION_CRON", "0 7 * * 3")  # 7 AM every Wednesday
+
+# ── Overseas market monitor schedules (all times in TIMEZONE / ET) ──
+# Nikkei / Tokyo Stock Exchange
+#   TSE opens ~8:00 PM ET (previous day), midday break, reopens ~11:30 PM ET
+#   Note: Japan does NOT observe DST. When the U.S. shifts to EDT the ET
+#   offsets move by one hour. Adjust these crons or add DST-aware logic later.
+NIKKEI_OPEN_CRON = os.getenv("NIKKEI_OPEN_CRON", "*/10 19-22 * * 0-4")  # Every 10 min, 7 PM–10:30 PM ET, Sun–Thu
+NIKKEI_REOPEN_CRON = os.getenv("NIKKEI_REOPEN_CRON", "*/15 23 * * 0-4")  # Every 15 min, 11 PM–2:30 AM ET, Sun–Thu (hour 23 portion)
+NIKKEI_REOPEN_LATE_CRON = os.getenv("NIKKEI_REOPEN_LATE_CRON", "*/15 0-2 * * 1-5")  # Every 15 min, midnight–2:30 AM ET, Mon–Fri
+
+# FTSE / London Stock Exchange
+#   LSE opens ~3:00 AM ET
+#   Note: UK observes DST (BST) but shifts on different dates than the U.S.
+#   There are ~2 weeks/year where the ET offset is off by one hour.
+FTSE_OPEN_CRON = os.getenv("FTSE_OPEN_CRON", "*/10 2-5 * * 1-5")  # Every 10 min, 2:30 AM–5:30 AM ET, Mon–Fri
+
+# Europe Handoff Summary — synthesizes Asia + Europe into a single pre-market brief
+EUROPE_HANDOFF_CRON = os.getenv("EUROPE_HANDOFF_CRON", "30 5 * * 1-5")  # 5:30 AM ET, Mon–Fri
+
+# Overseas monitor model (defaults to RESEARCH_MODEL for analysis quality)
+OVERSEAS_MODEL = os.getenv("OVERSEAS_MODEL", "")  # Empty = use RESEARCH_MODEL
+OVERSEAS_TIMEOUT = int(os.getenv("OVERSEAS_TIMEOUT", "600"))
+
 TIMEZONE = os.getenv("TZ", "America/New_York")
 
 # File paths
@@ -46,6 +69,11 @@ PORTFOLIO_HISTORY_PATH = os.path.join(DATA_DIR, "portfolio_history.json")
 MARKET_RESEARCH_PATH = os.path.join(DATA_DIR, "market_research.json")
 MARKET_BRIEF_PATH = os.path.join(DATA_DIR, "market_brief.md")
 TASK_HISTORY_PATH = os.path.join(DATA_DIR, "task_history.json")
+
+# Overseas market monitor output files
+NIKKEI_MONITOR_PATH = os.path.join(DATA_DIR, "nikkei_monitor.md")
+FTSE_MONITOR_PATH = os.path.join(DATA_DIR, "ftse_monitor.md")
+HANDOFF_SUMMARY_PATH = os.path.join(DATA_DIR, "handoff_summary.md")
 
 # Market data
 MARKET_DATA_SOURCE = os.getenv("MARKET_DATA_SOURCE", "yfinance")  # yfinance or alphavantage

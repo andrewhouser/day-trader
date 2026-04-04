@@ -203,12 +203,49 @@ def _update_trailing_stops(portfolio: dict, instruments: dict) -> list[dict]:
 
 
 def run_risk_monitor() -> dict:
-    """Run a risk monitoring cycle. Returns dict of alerts found."""
+    """Run a risk monitoring cycle. Returns dict of alerts found.
+
+    Now also checks overseas monitor summaries for overnight volatility
+    or macro developments that could affect U.S. positions.
+    """
     logger.info("Running risk monitor check...")
 
     portfolio = load_portfolio()
     instruments = fetch_instrument_prices()
     all_alerts = []
+
+    # 0. Check overseas summaries for overnight risk flags
+    try:
+        from overseas_monitors import get_asia_summary, get_europe_summary, get_handoff_summary
+        from exchange_calendar import is_exchange_open, get_schedule_drift_warning
+
+        # Log exchange status
+        jpx_open = is_exchange_open("JPX")
+        lse_open = is_exchange_open("LSE")
+        logger.info(f"Exchange status — JPX: {'open' if jpx_open else 'closed'}, LSE: {'open' if lse_open else 'closed'}")
+
+        drift = get_schedule_drift_warning()
+        if drift:
+            logger.warning(f"DST drift: {drift}")
+
+        # Prefer handoff summary, fall back to raw feeds
+        handoff = get_handoff_summary(1)
+        if handoff.strip():
+            overseas_context = f"Overnight Handoff: {handoff[:800]}\n"
+        else:
+            asia = get_asia_summary(1)
+            europe = get_europe_summary(1)
+            overseas_context = ""
+            if asia.strip():
+                overseas_context += f"Asia: {asia[:500]}\n"
+            if europe.strip():
+                overseas_context += f"Europe: {europe[:500]}\n"
+
+        if overseas_context:
+            logger.info("Risk monitor ingesting overseas context")
+    except Exception as e:
+        logger.debug(f"Could not load overseas summaries: {e}")
+        overseas_context = ""
 
     # 1. Update trailing stops and check for auto-trades
     auto_trades = _update_trailing_stops(portfolio, instruments)
