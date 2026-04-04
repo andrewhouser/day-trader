@@ -6,6 +6,7 @@ import { api, TaskHistoryEntry, TaskInfo } from "@/lib/api";
 import { cronToHuman } from "@/lib/cron";
 
 import { ScheduleEditor } from "./ScheduleEditor";
+
 import styles from "./Tasks.module.css";
 
 export function Tasks() {

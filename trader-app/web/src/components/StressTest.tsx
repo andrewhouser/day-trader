@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { api, StressTestResult } from "@/lib/api";
 
 import { ScenarioCard } from "./ScenarioCard";
+
 import styles from "./StressTest.module.css";
 
 export function StressTest() {

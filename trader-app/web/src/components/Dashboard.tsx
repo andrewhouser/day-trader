@@ -5,9 +5,10 @@ import { useEffect, useState } from "react";
 import { api, Portfolio, Position, TaskInfo } from "@/lib/api";
 import { cronToHuman } from "@/lib/cron";
 
-import styles from "./Dashboard.module.css";
 import { PortfolioChart } from "./PortfolioChart";
 import { PositionChart } from "./PositionChart";
+
+import styles from "./Dashboard.module.css";
 
 export function Dashboard() {
   const [error, setError] = useState("");

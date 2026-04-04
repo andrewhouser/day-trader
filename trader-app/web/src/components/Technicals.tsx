@@ -4,8 +4,9 @@ import { useEffect, useState } from "react";
 
 import { api } from "@/lib/api";
 
-import styles from "./Technicals.module.css";
 import { Tip } from "./Tip";
+
+import styles from "./Technicals.module.css";
 
 type RegimeData = {
   parameters: Record<string, unknown>;
