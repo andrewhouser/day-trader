@@ -31,6 +31,7 @@ from exchange_calendar import (
     get_schedule_drift_warning,
     TZ_ET,
 )
+from overseas_signals import emit_signal, get_pending_signals, format_signals_for_prompt
 
 logger = logging.getLogger(__name__)
 
@@ -56,6 +57,76 @@ FTSE_SYSTEM = (
     "session opens. Highlight cross-market handoff conditions. "
     "Be specific with numbers, levels, and percentage moves."
 )
+
+
+# ── Signal detection from ETF price moves ──────────────────
+
+# Maps overseas ETF tickers to their monitor source names
+_ASIA_ETFS = {"EWJ": "Japan (Nikkei proxy)"}
+_EUROPE_ETFS = {"EWU": "United Kingdom (FTSE proxy)", "EWG": "Germany (DAX proxy)"}
+
+
+def _detect_etf_signals(
+    etf_data: dict,
+    source: str,
+    etf_map: dict,
+    llm_summary: str,
+) -> list[dict]:
+    """Check ETF price moves against the signal threshold and emit signals.
+
+    Uses yfinance to compare current price vs previous close to detect
+    significant overnight/session moves.  The LLM summary is scanned for
+    a one-line driver explanation.
+
+    Returns the list of emitted signal dicts.
+    """
+    emitted = []
+    threshold = config.OVERSEAS_SIGNAL_THRESHOLD_PCT
+
+    for ticker, description in etf_map.items():
+        try:
+            t = yf.Ticker(ticker)
+            hist = t.history(period="2d")
+            if hist.empty or len(hist) < 2:
+                continue
+            prev_close = float(hist["Close"].iloc[-2])
+            current = float(hist["Close"].iloc[-1])
+            if prev_close == 0:
+                continue
+            change_pct = ((current - prev_close) / prev_close) * 100
+
+            if abs(change_pct) < threshold:
+                continue
+
+            direction = "bullish" if change_pct > 0 else "bearish"
+            urgency = "high" if abs(change_pct) >= threshold * 2 else "normal"
+
+            # Try to extract a driver from the LLM summary — fall back to generic
+            driver = (
+                f"{description} moved {change_pct:+.2f}% overnight. "
+                f"See {source} monitor summary for full context."
+            )
+
+            suggested = ""
+            if direction == "bullish" and change_pct >= threshold * 2:
+                suggested = "BUY"
+            elif direction == "bearish" and abs(change_pct) >= threshold * 2:
+                suggested = "SELL"
+
+            signal = emit_signal(
+                source=source,
+                ticker=ticker,
+                direction=direction,
+                move_pct=change_pct,
+                driver=driver,
+                urgency=urgency,
+                suggested_action=suggested,
+            )
+            emitted.append(signal)
+        except Exception as e:
+            logger.debug(f"Signal detection failed for {ticker}: {e}")
+
+    return emitted
 
 
 def _fetch_asia_data() -> dict:
@@ -218,6 +289,12 @@ Keep it concise and data-driven. Use bullet points."""
 """
     append_to_file(config.NIKKEI_MONITOR_PATH, entry)
     logger.info(f"Nikkei open monitor saved ({len(response)} chars)")
+
+    # Detect and emit trade signals for significant Asia ETF moves
+    signals = _detect_etf_signals(asia_data["etfs"], "nikkei_open", _ASIA_ETFS, response)
+    if signals:
+        logger.info(f"Nikkei open emitted {len(signals)} trade signal(s)")
+
     return response
 
 
@@ -299,6 +376,12 @@ Keep it concise. Focus on what changed since the morning session."""
 """
     append_to_file(config.NIKKEI_MONITOR_PATH, entry)
     logger.info(f"Nikkei reopen monitor saved ({len(response)} chars)")
+
+    # Detect and emit trade signals for significant Asia ETF moves
+    signals = _detect_etf_signals(asia_data["etfs"], "nikkei_reopen", _ASIA_ETFS, response)
+    if signals:
+        logger.info(f"Nikkei reopen emitted {len(signals)} trade signal(s)")
+
     return response
 
 
@@ -388,6 +471,12 @@ Keep it concise and data-driven. Use bullet points."""
 """
     append_to_file(config.FTSE_MONITOR_PATH, entry)
     logger.info(f"FTSE open monitor saved ({len(response)} chars)")
+
+    # Detect and emit trade signals for significant Europe ETF moves
+    signals = _detect_etf_signals(europe_data["etfs"], "ftse_open", _EUROPE_ETFS, response)
+    if signals:
+        logger.info(f"FTSE open emitted {len(signals)} trade signal(s)")
+
     return response
 
 
@@ -424,6 +513,19 @@ def run_europe_handoff() -> str:
     drift = get_schedule_drift_warning()
     drift_note = f"\n**DST Note:** {drift}" if drift else ""
 
+    # Include any pending overseas trade signals
+    pending_signals = get_pending_signals()
+    signals_block = ""
+    if pending_signals:
+        signals_block = f"""
+
+### Pending Overseas Trade Signals
+The following trade signals were emitted by overnight monitors and are awaiting
+evaluation by the U.S. trading agent:
+
+{format_signals_for_prompt(pending_signals)}
+"""
+
     prompt = f"""Europe Handoff Summary — {datetime.now().strftime('%Y-%m-%d %H:%M ET')}
 
 You are producing the final pre-market briefing before the U.S. session opens.
@@ -436,7 +538,7 @@ actionable summary for the U.S. trading agent.
 ### Europe at Open (FTSE / London)
 {europe_entries if europe_entries.strip() else "No Europe data available."}
 {drift_note}
-
+{signals_block}
 ---
 
 Produce a consolidated pre-market brief with these sections:
@@ -448,6 +550,7 @@ Produce a consolidated pre-market brief with these sections:
 5. **Risk Flags** — overnight volatility, gap risks, geopolitical catalysts
 6. **U.S. Session Setup** — 3-5 bullet points on what the U.S. trading agent should watch for at the open
 7. **Cross-Market Divergences** — where Asia and Europe disagreed, and what that means
+8. **Overseas Signal Assessment** — for each pending trade signal, provide your assessment of whether the signal is supported by the overnight data, any caveats, and whether the U.S. agent should prioritize it
 
 Keep it tight. This is the single document the U.S. agents will read for overnight context."""
 

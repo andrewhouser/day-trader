@@ -1,5 +1,18 @@
 # Changelog
 
+## 2026-04-04 (overseas trade signals)
+
+### Added
+- **Overseas trade signal queue** (`overseas_signals.py`) — new module that lets overseas monitors emit structured trade signals when they detect significant ETF moves (≥1.5% by default); signals carry direction, magnitude, driver explanation, urgency level, and optional suggested action; stale signals auto-pruned after 14 hours
+- **Signal detection in monitors** — `run_nikkei_open()`, `run_nikkei_reopen()`, and `run_ftse_open()` now check EWJ/EWU/EWG price moves against the configurable threshold after each analysis cycle and emit signals for the U.S. trading agent; moves ≥3% are flagged as high-urgency with a suggested BUY/SELL
+- **Hourly check consumes overseas signals** — `run_hourly_check()` reads pending signals, injects them into the trading prompt with dedicated evaluation instructions, and marks them as evaluated after the cycle; signals inform but do not bypass the standard composite scoring framework
+- **Europe Handoff includes pending signals** — `run_europe_handoff()` now reads and synthesizes any pending trade signals into the pre-market briefing, with a new "Overseas Signal Assessment" section
+- **API endpoint** `GET /api/overseas/signals` — returns pending and evaluated signals with counts
+- **Config entries**: `OVERSEAS_SIGNAL_THRESHOLD_PCT` (default 1.5%), `OVERSEAS_SIGNAL_MAX_AGE_HOURS` (default 14h), `OVERSEAS_SIGNALS_PATH`
+
+### Changed
+- Hourly trading prompt instructions expanded with section 10.5 covering overseas signal evaluation rules: standard scoring still required, high-urgency signals evaluated first, ETF gap-pricing staleness check, per-signal audit trail in analysis output
+
 ## 2026-04-04 (review fixes)
 
 ### Fixed

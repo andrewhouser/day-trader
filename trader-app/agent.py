@@ -727,6 +727,11 @@ def run_hourly_check():
     asia_summary = read_recent_entries(config.NIKKEI_MONITOR_PATH, 2)
     europe_summary = read_recent_entries(config.FTSE_MONITOR_PATH, 2)
 
+    # Read pending overseas trade signals
+    from overseas_signals import get_pending_signals, format_signals_for_prompt, mark_signals_evaluated
+    pending_overseas_signals = get_pending_signals()
+    overseas_signals_block = format_signals_for_prompt(pending_overseas_signals)
+
     # 3a. Rolling 30-day market context
     from market_context import get_market_context_for_prompt
     rolling_context = get_market_context_for_prompt()
@@ -832,6 +837,8 @@ def run_hourly_check():
 ### Europe-at-Open Summary (FTSE / London)
 {europe_summary if europe_summary.strip() and not handoff_summary.strip() else ("See handoff summary above." if handoff_summary.strip() else "No Europe data available.")}
 
+{overseas_signals_block if overseas_signals_block else "### Overseas Trade Signals\\nNo pending overseas signals."}
+
 ### Historical Performance Feedback
 {perf_feedback}
 
@@ -858,6 +865,11 @@ INSTRUCTIONS:
 9.5. Consult the STRATEGY PLAYBOOK. If a current setup matches a documented pattern with a known win rate, use that as a prior. High-confidence patterns (≥65% win rate, 8+ trades) warrant a stronger signal. Low-sample patterns are hypotheses — treat them accordingly.
 9.6. Check SUSPENDED STRATEGIES. Any strategy flagged ⛔ has empirically failed — do not execute trades that primarily rely on that approach.
 10. Check STOP-LOSS & TAKE-PROFIT levels for existing positions. Trailing stops are managed automatically, but factor them into your analysis.
+10.5. **OVERSEAS TRADE SIGNALS** — If there are pending overseas signals above, evaluate each one:
+   - Apply the standard scoring framework to the signal's ticker. The signal provides context (direction, move %, driver) but does NOT bypass your scoring thresholds.
+   - High-urgency signals (🔴) indicate large moves (≥{config.OVERSEAS_SIGNAL_THRESHOLD_PCT * 2}%) and should be evaluated first, but still require composite score > {config.SCORE_BUY_THRESHOLD} for a BUY.
+   - Consider whether the overseas move has already been priced into the U.S.-listed ETF. If the ETF gapped at the prior close, the signal may be stale.
+   - For each signal, state in your analysis: (a) whether you are acting on it, (b) the composite score, (c) why or why not.
 
 10. **SCORING FRAMEWORK** — Before making any trade decision, you MUST score each instrument you are considering on these dimensions:
     - **Trend score** (-2 to +2): Based on the instrument's OWN moving average alignment (SMA 20/50/200) and direction — NOT the market's trend. A sector ETF can be in a strong uptrend while SPY is falling; evaluate it on its own chart.
@@ -1064,6 +1076,12 @@ Focus on: What did you observe? Was there anything surprising? What will you wat
         f"{hourly_reflection}\n\n---\n",
     )
     logger.info("Market check reflection written")
+
+    # Mark overseas signals as evaluated now that the cycle is complete
+    if pending_overseas_signals:
+        signal_ids = [s["id"] for s in pending_overseas_signals]
+        mark_signals_evaluated(signal_ids)
+        logger.info(f"Marked {len(signal_ids)} overseas signal(s) as evaluated")
 
     logger.info("Market check complete")
 

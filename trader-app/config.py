@@ -89,6 +89,12 @@ STRATEGY_SCORES_PATH = os.path.join(DATA_DIR, "strategy_scores.json")
 NIKKEI_MONITOR_PATH = os.path.join(DATA_DIR, "nikkei_monitor.md")
 FTSE_MONITOR_PATH = os.path.join(DATA_DIR, "ftse_monitor.md")
 HANDOFF_SUMMARY_PATH = os.path.join(DATA_DIR, "handoff_summary.md")
+OVERSEAS_SIGNALS_PATH = os.path.join(DATA_DIR, "overseas_signals.json")
+
+# Overseas signal thresholds — minimum move % to emit a trade signal
+OVERSEAS_SIGNAL_THRESHOLD_PCT = float(os.getenv("OVERSEAS_SIGNAL_THRESHOLD_PCT", "1.5"))
+# Maximum age (hours) before a signal is considered stale and auto-expired
+OVERSEAS_SIGNAL_MAX_AGE_HOURS = int(os.getenv("OVERSEAS_SIGNAL_MAX_AGE_HOURS", "14"))
 
 # Market data
 MARKET_DATA_SOURCE = os.getenv("MARKET_DATA_SOURCE", "yfinance")  # yfinance or alphavantage

@@ -822,6 +822,16 @@ def get_handoff_summary(limit: int = 3):
     return entries
 
 
+@app.get("/api/overseas/signals")
+def get_overseas_signals():
+    """Return all overseas trade signals (pending and evaluated)."""
+    from overseas_signals import _load_signals, _prune_stale
+    signals = _prune_stale(_load_signals())
+    pending = [s for s in signals if s.get("status") == "pending"]
+    evaluated = [s for s in signals if s.get("status") == "evaluated"]
+    return {"pending": pending, "evaluated": evaluated, "total": len(signals)}
+
+
 @app.get("/api/playbook")
 def get_playbook():
     """Return the current strategy playbook content."""
