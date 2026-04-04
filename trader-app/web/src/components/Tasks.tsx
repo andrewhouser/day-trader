@@ -68,6 +68,25 @@ export function Tasks() {
     );
   }
 
+  const CATEGORY_ORDER = [
+    "Overseas Monitors",
+    "Core Trading",
+    "Intelligence",
+    "Risk & Portfolio",
+    "Maintenance",
+  ];
+
+  const grouped = CATEGORY_ORDER.reduce<Record<string, TaskInfo[]>>((acc, cat) => {
+    const items = tasks.filter((t) => t.category === cat);
+    if (items.length > 0) acc[cat] = items;
+    return acc;
+  }, {});
+
+  // Catch any tasks with unknown categories
+  const knownIds = new Set(Object.values(grouped).flat().map((t) => t.task_id));
+  const uncategorized = tasks.filter((t) => !knownIds.has(t.task_id));
+  if (uncategorized.length > 0) grouped["Other"] = uncategorized;
+
   return (
     <div className={styles.container}>
       {actionMsg && (
@@ -75,8 +94,11 @@ export function Tasks() {
       )}
 
       <div className="section-title">Agent Tasks</div>
-      <div className="grid-2">
-        {tasks.map((task) => (
+      {Object.entries(grouped).map(([category, categoryTasks]) => (
+        <div key={category}>
+          <div className={styles.categoryHeader}>{category}</div>
+          <div className="grid-2">
+            {categoryTasks.map((task) => (
           <div className="card" key={task.task_id}>
             <div className={styles.taskCardHeader}>
               <div>
@@ -154,6 +176,8 @@ export function Tasks() {
           </div>
         ))}
       </div>
+      </div>
+      ))}
 
       <div className="section-title" style={{ marginTop: "0.5rem" }}>Execution History</div>
       <div className={`card ${styles.historyCard}`}>

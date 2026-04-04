@@ -4,6 +4,16 @@
   padding: 0.75rem;
 }
 
+.categoryHeader {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.5rem;
+  margin-top: 0.25rem;
+  text-transform: uppercase;
+}
+
 .container {
   display: flex;
   flex-direction: column;

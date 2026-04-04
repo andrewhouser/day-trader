@@ -81,6 +81,7 @@ export interface TradeEntry {
 export interface TaskInfo {
   task_id: string;
   name: string;
+  category: string;
   cron: string;
   is_running: boolean;
   last_run: {

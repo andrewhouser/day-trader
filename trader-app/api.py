@@ -472,21 +472,21 @@ def get_report(filename: str):
 # ── Task Management ────────────────────────────────────────
 
 TASK_REGISTRY = {
-    "nikkei_open": {"name": "Nikkei Open Monitor", "func": run_nikkei_open},
-    "nikkei_reopen": {"name": "Nikkei Reopen Monitor", "func": run_nikkei_reopen},
-    "nikkei_reopen_late": {"name": "Nikkei Reopen Monitor (late)", "func": run_nikkei_reopen},
-    "ftse_open": {"name": "FTSE Open Monitor", "func": run_ftse_open},
-    "europe_handoff": {"name": "Europe Handoff Summary", "func": run_europe_handoff},
-    "research": {"name": "Market Research", "func": run_research},
-    "hourly_check": {"name": "Market Check", "func": run_hourly_check},
-    "morning_report": {"name": "Morning Report", "func": run_morning_report},
-    "compaction": {"name": "Memory Compaction", "func": run_compaction},
-    "sentiment": {"name": "Sentiment Analysis", "func": run_sentiment},
-    "risk_monitor": {"name": "Risk Monitor", "func": run_risk_monitor},
-    "rebalancer": {"name": "Portfolio Rebalancer", "func": run_rebalancer},
-    "performance": {"name": "Performance Analysis", "func": run_performance_analysis},
-    "events": {"name": "Events Calendar", "func": run_events_calendar},
-    "expansion": {"name": "Portfolio Expansion", "func": run_expansion_analysis},
+    "nikkei_open": {"name": "Nikkei Open Monitor", "func": run_nikkei_open, "category": "Overseas Monitors"},
+    "nikkei_reopen": {"name": "Nikkei Reopen Monitor", "func": run_nikkei_reopen, "category": "Overseas Monitors"},
+    "nikkei_reopen_late": {"name": "Nikkei Reopen Monitor (late)", "func": run_nikkei_reopen, "category": "Overseas Monitors"},
+    "ftse_open": {"name": "FTSE Open Monitor", "func": run_ftse_open, "category": "Overseas Monitors"},
+    "europe_handoff": {"name": "Europe Handoff Summary", "func": run_europe_handoff, "category": "Overseas Monitors"},
+    "research": {"name": "Market Research", "func": run_research, "category": "Core Trading"},
+    "hourly_check": {"name": "Market Check", "func": run_hourly_check, "category": "Core Trading"},
+    "morning_report": {"name": "Morning Report", "func": run_morning_report, "category": "Core Trading"},
+    "compaction": {"name": "Memory Compaction", "func": run_compaction, "category": "Maintenance"},
+    "sentiment": {"name": "Sentiment Analysis", "func": run_sentiment, "category": "Intelligence"},
+    "risk_monitor": {"name": "Risk Monitor", "func": run_risk_monitor, "category": "Risk & Portfolio"},
+    "rebalancer": {"name": "Portfolio Rebalancer", "func": run_rebalancer, "category": "Risk & Portfolio"},
+    "performance": {"name": "Performance Analysis", "func": run_performance_analysis, "category": "Maintenance"},
+    "events": {"name": "Events Calendar", "func": run_events_calendar, "category": "Intelligence"},
+    "expansion": {"name": "Portfolio Expansion", "func": run_expansion_analysis, "category": "Risk & Portfolio"},
 }
 
 TASK_CRON_MAP = {
@@ -539,6 +539,7 @@ def get_tasks():
         tasks.append({
             "task_id": task_id,
             "name": info["name"],
+            "category": info.get("category", "Other"),
             "cron": cron,
             "is_running": is_running,
             "last_run": last_run,
