@@ -5,6 +5,16 @@
   padding-bottom: 2rem;
 }
 
+.categoryRow {
+  background: rgba(255, 255, 255, 0.02);
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  padding: 0.5rem 0.75rem 0.3rem;
+  text-transform: uppercase;
+}
+
 .clickableRow {
   cursor: pointer;
 }

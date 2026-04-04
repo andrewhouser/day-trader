@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 
 import { api, Portfolio, Position, TaskInfo } from "@/lib/api";
+import { groupTasksByCategory } from "@/lib/constants";
 import { cronToHuman } from "@/lib/cron";
 
 import { PortfolioChart } from "./PortfolioChart";
@@ -188,7 +189,12 @@ export function Dashboard() {
             </tr>
           </thead>
           <tbody>
-            {tasks.map((task) => (
+            {Object.entries(groupTasksByCategory(tasks)).map(([category, categoryTasks]) => (
+              <>
+                <tr key={`cat-${category}`}>
+                  <td className={styles.categoryRow} colSpan={6}>{category}</td>
+                </tr>
+                {categoryTasks.map((task) => (
               <tr key={task.task_id}>
                 <td className={styles.taskName}>{task.name}</td>
                 <td className={styles.taskSchedule}>{cronToHuman(task.cron)}</td>
@@ -214,7 +220,7 @@ export function Dashboard() {
                 <td>
                   {task.last_run ? (
                     <span
-                      className={`badge ${task.last_run.status === "completed" ? "badge-green" : task.last_run.status === "failed" ? "badge-red" : "badge-yellow"}`}
+                      className={`badge ${task.last_run.status === "completed" ? "badge-green" : task.last_run.status === "failed" || task.last_run.status === "cancelled" ? "badge-red" : "badge-yellow"}`}
                     >
                       {task.last_run.status}
                     </span>
@@ -223,6 +229,8 @@ export function Dashboard() {
                   )}
                 </td>
               </tr>
+                ))}
+              </>
             ))}
           </tbody>
         </table>

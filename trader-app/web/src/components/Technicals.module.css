@@ -48,7 +48,6 @@
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: 6px;
-  bottom: calc(100% + 6px);
   color: var(--text);
   font-size: 0.85rem;
   font-weight: 400;
@@ -60,6 +59,7 @@
   pointer-events: none;
   position: absolute;
   text-transform: none;
+  top: calc(100% + 6px);
   transform: translateX(-50%);
   transition: opacity 0.15s;
   visibility: hidden;

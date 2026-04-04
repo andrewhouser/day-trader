@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { api, TaskHistoryEntry, TaskInfo } from "@/lib/api";
+import { groupTasksByCategory } from "@/lib/constants";
 import { cronToHuman } from "@/lib/cron";
 
 import { ScheduleEditor } from "./ScheduleEditor";
@@ -68,24 +69,7 @@ export function Tasks() {
     );
   }
 
-  const CATEGORY_ORDER = [
-    "Overseas Monitors",
-    "Core Trading",
-    "Intelligence",
-    "Risk & Portfolio",
-    "Maintenance",
-  ];
-
-  const grouped = CATEGORY_ORDER.reduce<Record<string, TaskInfo[]>>((acc, cat) => {
-    const items = tasks.filter((t) => t.category === cat);
-    if (items.length > 0) acc[cat] = items;
-    return acc;
-  }, {});
-
-  // Catch any tasks with unknown categories
-  const knownIds = new Set(Object.values(grouped).flat().map((t) => t.task_id));
-  const uncategorized = tasks.filter((t) => !knownIds.has(t.task_id));
-  if (uncategorized.length > 0) grouped["Other"] = uncategorized;
+  const grouped = groupTasksByCategory(tasks);
 
   return (
     <div className={styles.container}>

@@ -1,5 +1,27 @@
 # Changelog
 
+## 2026-04-04
+
+### Fixed
+- Fixed technical indicator tooltip bubbles not appearing on hover — tooltip now renders below the header (inside the overflow area) and includes a native `title` fallback
+- Fixed performance reports rendering raw JSON instead of human-readable metrics — metrics now display as a visual card grid with collapsible raw JSON; LLM errors show a clear warning banner
+- Fixed task stop button returning 404 for scheduler-started tasks
+- Fixed manually triggered tasks stuck as RUNNING forever due to `_sync_task_history()` orphaning in-memory entry references
+- Fixed Docker build failures from ESLint `simple-import-sort` errors and vitest/vite type mismatch
+- Fixed backend crash (`ModuleNotFoundError: overseas_monitors`) — added missing modules to Dockerfile COPY
+
+### Added
+- Finnhub real-time quotes — `get_finnhub_quote()` in `market_data.py` as Level 0 price source before yfinance fallback; uses Finnhub `h`/`l`/`d`/`dp` fields for high, low, change, change percent on ETFs
+- Task category grouping on both the Tasks page and Dashboard Scheduled Tasks table — agents organized under Overseas Monitors, Core Trading, Intelligence, Risk & Portfolio, and Maintenance
+- Shared `groupTasksByCategory()` utility and `TASK_CATEGORY_ORDER` constant in `lib/constants.ts`
+- Task cancellation system — stop button sets a flag checked by `call_ollama` before each LLM request; `TaskCancelledError` propagates through scheduler and API wrappers
+- Performance analyst retries once on LLM failure before writing the error to the report
+
+### Changed
+- Moved README to repository root
+- Updated README with current model assignments, Finnhub market data, expansion agent, missing API endpoints, and dashboard views
+- Removed obsolete `day_trader_agent_setup.md`
+
 ## 2026-04-03
 
 ### Added

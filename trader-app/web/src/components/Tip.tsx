@@ -11,7 +11,7 @@ export function Tip({ label, tooltips }: Props) {
   const tip = tooltips[label];
   if (!tip) return <>{label}</>;
   return (
-    <span className={styles.tipWrapper}>
+    <span className={styles.tipWrapper} title={tip}>
       {label}
       <span className={styles.tipBubble}>{tip}</span>
     </span>

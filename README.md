@@ -523,7 +523,7 @@ Task IDs: `research`, `hourly_check`, `morning_report`, `compaction`, `sentiment
 
 The dashboard at http://localhost:3000 provides the following views:
 
-- **Dashboard** — Portfolio value, cash, return %, market regime badge, open positions (clickable with price history chart modal), scheduled task status, index tracker bar (auto-refreshes every 30s)
+- **Dashboard** — Portfolio value, cash, return %, market regime badge, open positions (clickable with price history chart modal), scheduled tasks grouped by category, index tracker bar (auto-refreshes every 30s)
 - **Trades** — Full trade log with expandable reasoning for each entry
 - **Technicals** — Technical indicators table for all instruments (SMA, RSI, MACD, ATR, Bollinger Bands, volume ratio, ROC) with tooltip explanations, plus market regime classification with supporting signals
 - **Research** — Research notes rendered as markdown
@@ -532,10 +532,10 @@ The dashboard at http://localhost:3000 provides the following views:
 - **Sentiment** — News sentiment scores and analysis per instrument
 - **Risk** — Risk monitor alert history (stop-losses, trailing stops, take-profits, drawdowns, volatility, correlation) with stress test panel
 - **Events** — Economic events calendar for the week ahead
-- **Performance** — Weekly quantitative performance reports with metrics and adaptive score weights
+- **Performance** — Weekly quantitative performance reports with visual metric cards (portfolio value, win rate, P&L, drawdown), adaptive score weights, and collapsible raw JSON
 - **Reports** — Accordion list of daily morning reports
 - **Reflections** — Agent self-assessments rendered as markdown
-- **Tasks** — Manual task controls (run/stop) for all agents, cron schedules, and execution history (auto-refreshes every 5s)
+- **Tasks** — Manual task controls (run/stop) for all agents grouped by category, cron schedules, and execution history (auto-refreshes every 5s)
 - **Chat** — Conversational interface for interrogating agents about their trading decisions
 
 The frontend proxies all `/api/*` requests to the backend via Next.js rewrites.
