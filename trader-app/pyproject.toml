@@ -1,0 +1,50 @@
+[project]
+name = "day-trader"
+version = "1.0.0"
+requires-python = ">=3.12"
+dependencies = [
+    "APScheduler>=3.10.4",
+    "fastapi>=0.111.0",
+    "pandas-ta>=0.3.14b",
+    "pytz>=2024.1",
+    "requests>=2.31.0",
+    "uvicorn>=0.29.0",
+    "yfinance>=0.2.36",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "F",   # pyflakes
+    "I",   # isort
+    "N",   # pep8-naming
+    "UP",  # pyupgrade
+    "W",   # pycodestyle warnings
+]
+ignore = [
+    "E501",  # line too long — handled by formatter
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["agent", "api", "config", "market_data", "regime", "research", "risk_monitor", "scheduler"]
+
+[tool.ruff.format]
+indent-style = "space"
+quote-style = "double"
+
+[tool.mypy]
+python_version = "3.12"
+ignore_missing_imports = true
+strict = false
+warn_return_any = true
+warn_unused_configs = true
+warn_unused_ignores = true
+
+[tool.pytest.ini_options]
+testpaths = ["research/tests"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]

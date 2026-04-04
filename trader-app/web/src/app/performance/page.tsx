@@ -1,4 +1,4 @@
-import Performance from "@/components/Performance";
+import { Performance } from "@/components/Performance";
 
 export default function PerformancePage() {
   return <Performance />;

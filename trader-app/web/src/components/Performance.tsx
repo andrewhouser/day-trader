@@ -3,9 +3,19 @@
 import { useEffect, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+
 import { api, ScoreWeightsResult } from "@/lib/api";
 
-const DIMS = ["trend", "momentum", "sentiment", "risk_reward", "event_risk", "sector_divergence"];
+import styles from "./Performance.module.css";
+
+const DIMS = [
+  "event_risk",
+  "momentum",
+  "risk_reward",
+  "sector_divergence",
+  "sentiment",
+  "trend",
+];
 
 function weightColor(v: number): string {
   if (v > 1.0) return "var(--green)";
@@ -13,10 +23,10 @@ function weightColor(v: number): string {
   return "var(--text-muted)";
 }
 
-export default function Performance() {
+export function Performance() {
   const [entries, setEntries] = useState<{ raw: string }[]>([]);
-  const [weights, setWeights] = useState<ScoreWeightsResult | null>(null);
   const [loading, setLoading] = useState(true);
+  const [weights, setWeights] = useState<ScoreWeightsResult | null>(null);
 
   useEffect(() => {
     Promise.all([
@@ -25,49 +35,63 @@ export default function Performance() {
     ]).finally(() => setLoading(false));
   }, []);
 
-  if (loading) return <div className="empty-state"><span className="spinner" /> Loading performance...</div>;
+  if (loading) {
+    return (
+      <div className="empty-state">
+        <span className="spinner" /> Loading performance...
+      </div>
+    );
+  }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem", paddingBottom: "2rem" }}>
-      {/* Score Weights */}
+    <div className={styles.container}>
       {weights && Object.keys(weights.weights).length > 0 && (
         <>
           <div className="section-title">Score Dimension Weights</div>
-          <div className="card" style={{ overflowX: "auto" }}>
+          <div className={`card ${styles.overflowX}`}>
             <table>
               <thead>
                 <tr>
                   <th>Ticker</th>
-                  {DIMS.map((d) => <th key={d}>{d.replace("_", " ")}</th>)}
+                  {DIMS.map((d) => (
+                    <th key={d}>{d.replace("_", " ")}</th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
-                {Object.entries(weights.weights).sort(([a], [b]) => a.localeCompare(b)).map(([ticker, w]) => (
-                  <tr key={ticker}>
-                    <td style={{ fontWeight: 600 }}>{ticker}</td>
-                    {DIMS.map((d) => {
-                      const v = w[d] ?? 1.0;
-                      return (
-                        <td key={d} style={{ color: weightColor(v), fontWeight: v !== 1.0 ? 600 : 400 }}>
-                          {v.toFixed(2)}
-                        </td>
-                      );
-                    })}
-                  </tr>
-                ))}
+                {Object.entries(weights.weights)
+                  .sort(([a], [b]) => a.localeCompare(b))
+                  .map(([ticker, w]) => (
+                    <tr key={ticker}>
+                      <td className={styles.tickerCell}>{ticker}</td>
+                      {DIMS.map((d) => {
+                        const v = w[d] ?? 1.0;
+                        return (
+                          <td
+                            className={v !== 1.0 ? styles.weightCellModified : undefined}
+                            key={d}
+                            style={{ color: weightColor(v) }}
+                          >
+                            {v.toFixed(2)}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
               </tbody>
             </table>
           </div>
         </>
       )}
 
-      {/* Performance Reports */}
       <div className="section-title">Performance Reports ({entries.length})</div>
       {entries.length === 0 ? (
-        <div className="empty-state">No performance reports yet. Analysis runs weekly on Fridays.</div>
+        <div className="empty-state">
+          No performance reports yet. Analysis runs weekly on Fridays.
+        </div>
       ) : (
         entries.map((entry, i) => (
-          <div key={i} className="card markdown-body">
+          <div className="card markdown-body" key={i}>
             <ReactMarkdown remarkPlugins={[remarkGfm]}>{entry.raw}</ReactMarkdown>
           </div>
         ))

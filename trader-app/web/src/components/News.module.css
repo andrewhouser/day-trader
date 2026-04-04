@@ -1,0 +1,77 @@
+.articleCard {
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.articleCard:hover {
+  background: var(--bg-card-hover);
+}
+
+.articleCardLink {
+  color: inherit;
+  text-decoration: none;
+}
+
+.articleContent {
+  flex: 1;
+}
+
+.articleHeader {
+  align-items: flex-start;
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+}
+
+.articleMeta {
+  align-items: center;
+  color: var(--text-muted);
+  display: flex;
+  font-size: 0.75rem;
+  gap: 0.75rem;
+}
+
+.articleTitle {
+  font-size: 0.9rem;
+  font-weight: 600;
+  line-height: 1.4;
+  margin-bottom: 0.35rem;
+}
+
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding-bottom: 2rem;
+}
+
+.errorCard {
+  color: var(--red);
+}
+
+.filterRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.headerRow {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+}
+
+.sectionTitleInline {
+  margin: 0;
+}
+
+.tickerBadge {
+  font-size: 0.65rem;
+}
+
+.tickerList {
+  display: flex;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}

@@ -1,0 +1,30 @@
+.header {
+  border-bottom: 1px solid var(--border);
+  padding: 1rem 1.5rem;
+}
+
+.headerContent {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+}
+
+.headerLogo {
+  align-items: center;
+  display: flex;
+  gap: 0.75rem;
+}
+
+.headerLogoEmoji {
+  font-size: 1.25rem;
+}
+
+.headerSubtitle {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+}
+
+.headerTitle {
+  font-size: 1.1rem;
+  font-weight: 700;
+}

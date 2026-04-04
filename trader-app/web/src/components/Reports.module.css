@@ -1,0 +1,52 @@
+.accordionChevron {
+  color: var(--text-muted);
+  flex-shrink: 0;
+  font-size: 0.65rem;
+  transition: transform 0.2s ease;
+}
+
+.accordionChevronOpen {
+  transform: rotate(90deg);
+}
+
+.accordionContent {
+  border-top: 1px solid var(--border);
+  padding: 0 1.25rem 1.25rem;
+}
+
+.accordionTitle {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.accordionTrigger {
+  align-items: center;
+  background: var(--bg-card);
+  border: none;
+  color: var(--text);
+  cursor: pointer;
+  display: flex;
+  font-size: 0.9rem;
+  font-weight: 500;
+  gap: 0.6rem;
+  padding: 0.85rem 1.25rem;
+  text-align: left;
+  transition: background 0.15s;
+  width: 100%;
+}
+
+.accordionTrigger:hover {
+  background: var(--bg-card-hover);
+}
+
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding-bottom: 2rem;
+}
+
+.latestBadge {
+  margin-left: auto;
+}

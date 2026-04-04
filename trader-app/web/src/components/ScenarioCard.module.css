@@ -1,0 +1,80 @@
+.currentLabel {
+  color: var(--text-muted);
+}
+
+.details {
+  display: flex;
+  font-size: 0.85rem;
+  gap: 1.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.estimatedLoss {
+  color: var(--red);
+}
+
+.header {
+  align-items: flex-start;
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+}
+
+.pctBadge {
+  font-size: 0.9rem;
+  padding: 0.3rem 0.75rem;
+}
+
+.reductionNote {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  margin-top: 0.35rem;
+}
+
+.scenarioDescription {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
+.scenarioName {
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+}
+
+.shockedLabel {
+  color: var(--text-muted);
+}
+
+.shockedValueNegative {
+  color: var(--red);
+  font-weight: 600;
+}
+
+.shockedValuePositive {
+  color: var(--green);
+  font-weight: 600;
+}
+
+.statValue {
+  font-weight: 600;
+}
+
+.subsection {
+  margin-bottom: 0.75rem;
+}
+
+.subsectionTitle {
+  font-size: 0.8rem;
+  font-weight: 600;
+  margin-bottom: 0.35rem;
+}
+
+.summary {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  font-style: italic;
+}
+
+.tickerCell {
+  font-weight: 600;
+}

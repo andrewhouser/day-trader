@@ -1,0 +1,53 @@
+.closeButton {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 1.2rem;
+}
+
+.dataPointsLabel {
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  margin-top: 0.35rem;
+  text-align: right;
+}
+
+.emptyChart {
+  height: 260px;
+}
+
+.errorChart {
+  color: var(--red);
+  height: 260px;
+}
+
+.modalContent {
+  max-width: 720px;
+  padding: 1.25rem;
+}
+
+.modalHeader {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+}
+
+.modalTitle {
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.rangeButton {
+  border: none;
+  cursor: pointer;
+  font-size: 0.8rem;
+  padding: 0.3rem 0.6rem;
+}
+
+.rangeButtons {
+  display: flex;
+  gap: 0.35rem;
+  margin-bottom: 0.75rem;
+}

@@ -1,4 +1,4 @@
-import Trades from "@/components/Trades";
+import { Trades } from "@/components/Trades";
 
 export default function TradesPage() {
   return <Trades />;

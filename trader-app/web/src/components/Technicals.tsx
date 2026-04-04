@@ -1,50 +1,58 @@
 "use client";
 
 import { useEffect, useState } from "react";
+
 import { api } from "@/lib/api";
 
-type TechnicalData = Record<string, Record<string, number | string | null>>;
+import styles from "./Technicals.module.css";
+import { Tip } from "./Tip";
+
 type RegimeData = {
-  regime: string;
-  timestamp: string;
-  signals: Record<string, unknown>;
   parameters: Record<string, unknown>;
+  regime: string;
+  signals: Record<string, unknown>;
+  timestamp: string;
 };
+type TechnicalData = Record<string, Record<string, number | string | null>>;
 
 const TOOLTIPS: Record<string, string> = {
-  VIX: "CBOE Volatility Index — measures expected 30-day S&P 500 volatility. Above 20 signals fear, below 15 signals complacency.",
-  "SPY RSI": "Relative Strength Index for SPY over 14 periods. Above 70 is overbought, below 30 is oversold.",
-  "SPY ROC(20d)": "Rate of Change — SPY's percentage price change over the last 20 trading days.",
-  "SMA 50/200": "50-day vs 200-day Simple Moving Average crossover. Golden Cross (50 > 200) is bullish, Death Cross is bearish.",
-  Ticker: "The ETF or instrument symbol.",
-  Price: "Latest market price.",
-  "SMA 20": "Simple Moving Average over 20 days — short-term trend direction.",
-  "SMA 50": "Simple Moving Average over 50 days — medium-term trend direction.",
-  "SMA 200": "Simple Moving Average over 200 days — long-term trend direction.",
-  RSI: "Relative Strength Index (14-period). Above 70 is overbought, below 30 is oversold.",
-  "MACD Hist": "MACD Histogram — difference between the MACD line and signal line. Positive is bullish momentum, negative is bearish.",
   ATR: "Average True Range (14-period) — measures daily price volatility in dollar terms.",
-  "BB Low": "Bollinger Band lower bound (SMA 20 − 2 std dev). Price near this level may be oversold.",
-  "BB High": "Bollinger Band upper bound (SMA 20 + 2 std dev). Price near this level may be overbought.",
-  "Vol Ratio": "Volume Ratio — today's volume divided by the 20-day average. Above 1 means higher-than-normal activity.",
+  "BB High":
+    "Bollinger Band upper bound (SMA 20 + 2 std dev). Price near this level may be overbought.",
+  "BB Low":
+    "Bollinger Band lower bound (SMA 20 − 2 std dev). Price near this level may be oversold.",
+  "MACD Hist":
+    "MACD Histogram — difference between the MACD line and signal line. Positive is bullish momentum, negative is bearish.",
+  Price: "Latest market price.",
+  RSI: "Relative Strength Index (14-period). Above 70 is overbought, below 30 is oversold.",
   "ROC 20d": "Rate of Change — percentage price change over the last 20 trading days.",
+  "SMA 20": "Simple Moving Average over 20 days — short-term trend direction.",
+  "SMA 200": "Simple Moving Average over 200 days — long-term trend direction.",
+  "SMA 50": "Simple Moving Average over 50 days — medium-term trend direction.",
+  "SMA 50/200":
+    "50-day vs 200-day Simple Moving Average crossover. Golden Cross (50 > 200) is bullish, Death Cross is bearish.",
+  "SPY ROC(20d)": "Rate of Change — SPY's percentage price change over the last 20 trading days.",
+  "SPY RSI":
+    "Relative Strength Index for SPY over 14 periods. Above 70 is overbought, below 30 is oversold.",
+  Ticker: "The ETF or instrument symbol.",
+  VIX: "CBOE Volatility Index — measures expected 30-day S&P 500 volatility. Above 20 signals fear, below 15 signals complacency.",
+  "Vol Ratio":
+    "Volume Ratio — today's volume divided by the 20-day average. Above 1 means higher-than-normal activity.",
 };
 
-function Tip({ label }: { label: string }) {
-  const tip = TOOLTIPS[label];
-  if (!tip) return <>{label}</>;
-  return (
-    <span className="tip-wrapper">
-      {label}
-      <span className="tip-bubble">{tip}</span>
-    </span>
-  );
-}
+const REGIME_COLORS: Record<string, string> = {
+  DOWNTREND: "var(--red)",
+  HIGH_VOLATILITY: "var(--yellow)",
+  SIDEWAYS: "var(--yellow)",
+  STRONG_DOWNTREND: "var(--red)",
+  STRONG_UPTREND: "var(--green)",
+  UPTREND: "var(--green)",
+};
 
-export default function Technicals() {
-  const [technicals, setTechnicals] = useState<TechnicalData | null>(null);
-  const [regime, setRegime] = useState<RegimeData | null>(null);
+export function Technicals() {
   const [error, setError] = useState("");
+  const [regime, setRegime] = useState<RegimeData | null>(null);
+  const [technicals, setTechnicals] = useState<TechnicalData | null>(null);
 
   useEffect(() => {
     load();
@@ -53,12 +61,11 @@ export default function Technicals() {
   async function load() {
     try {
       const t = await api.getTechnicals();
-      setTechnicals(t);
       setError("");
+      setTechnicals(t);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Failed to load");
     }
-    // Regime is non-critical — don't let it block the page
     try {
       const r = await api.getRegime();
       setRegime(r);
@@ -67,75 +74,129 @@ export default function Technicals() {
     }
   }
 
-  if (error) return <div className="card" style={{ color: "var(--red)" }}>Error: {error}</div>;
-  if (!technicals) return <div className="empty-state"><span className="spinner" /> Loading technicals...</div>;
-
-  const regimeColors: Record<string, string> = {
-    STRONG_UPTREND: "var(--green)",
-    UPTREND: "var(--green)",
-    SIDEWAYS: "var(--yellow)",
-    DOWNTREND: "var(--red)",
-    STRONG_DOWNTREND: "var(--red)",
-    HIGH_VOLATILITY: "var(--yellow)",
-  };
+  if (error) {
+    return <div className={`card ${styles.errorCard}`}>Error: {error}</div>;
+  }
+  if (!technicals) {
+    return (
+      <div className="empty-state">
+        <span className="spinner" /> Loading technicals...
+      </div>
+    );
+  }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "1rem", paddingBottom: "2rem" }}>
+    <div className={styles.container}>
       {regime && (
         <div className="card">
           <div className="section-title">Market Regime</div>
-          <div style={{ display: "flex", gap: "1rem", alignItems: "center", flexWrap: "wrap" }}>
-            <span className="badge" style={{
-              background: regimeColors[regime.regime] || "var(--text-muted)",
-              color: "#fff", fontSize: "1rem", padding: "0.4rem 1rem"
-            }}>
+          <div className={styles.regimeRow}>
+            <span
+              className={`badge ${styles.regimeBadge}`}
+              style={{
+                background: REGIME_COLORS[regime.regime] || "var(--text-muted)",
+                color: "#fff",
+              }}
+            >
               {regime.regime}
             </span>
-            <span style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>
+            <span className={styles.regimeStrategyNote}>
               {(regime.parameters as Record<string, string>).strategy_note}
             </span>
           </div>
-          <div style={{ marginTop: "0.75rem", fontSize: "0.85rem", display: "flex", gap: "1.5rem", flexWrap: "wrap" }}>
-            {regime.signals.vix != null && <span><Tip label="VIX" />: {String(regime.signals.vix)}</span>}
-            {regime.signals.rsi != null && <span><Tip label="SPY RSI" />: {String(regime.signals.rsi)}</span>}
-            {regime.signals.roc_20 != null && <span><Tip label="SPY ROC(20d)" />: {String(regime.signals.roc_20)}%</span>}
-            <span><Tip label="SMA 50/200" />: {regime.signals.golden_cross ? "Golden Cross ✅" : "Death Cross ❌"}</span>
+          <div className={styles.regimeSignals}>
+            {regime.signals.vix != null && (
+              <span>
+                <Tip label="VIX" tooltips={TOOLTIPS} />: {String(regime.signals.vix)}
+              </span>
+            )}
+            {regime.signals.rsi != null && (
+              <span>
+                <Tip label="SPY RSI" tooltips={TOOLTIPS} />: {String(regime.signals.rsi)}
+              </span>
+            )}
+            {regime.signals.roc_20 != null && (
+              <span>
+                <Tip label="SPY ROC(20d)" tooltips={TOOLTIPS} />:{" "}
+                {String(regime.signals.roc_20)}%
+              </span>
+            )}
+            <span>
+              <Tip label="SMA 50/200" tooltips={TOOLTIPS} />:{" "}
+              {regime.signals.golden_cross ? "Golden Cross ✅" : "Death Cross ❌"}
+            </span>
           </div>
         </div>
       )}
 
       <div className="card">
         <div className="section-title">Technical Indicators</div>
-        <div style={{ overflowX: "auto" }}>
+        <div className={styles.overflowX}>
           <table>
             <thead>
               <tr>
-                <th><Tip label="Ticker" /></th>
-                <th><Tip label="Price" /></th>
-                <th><Tip label="SMA 20" /></th>
-                <th><Tip label="SMA 50" /></th>
-                <th><Tip label="SMA 200" /></th>
-                <th><Tip label="RSI" /></th>
-                <th><Tip label="MACD Hist" /></th>
-                <th><Tip label="ATR" /></th>
-                <th><Tip label="BB Low" /></th>
-                <th><Tip label="BB High" /></th>
-                <th><Tip label="Vol Ratio" /></th>
-                <th><Tip label="ROC 20d" /></th>
+                <th>
+                  <Tip label="Ticker" tooltips={TOOLTIPS} />
+                </th>
+                <th>
+                  <Tip label="Price" tooltips={TOOLTIPS} />
+                </th>
+                <th>
+                  <Tip label="SMA 20" tooltips={TOOLTIPS} />
+                </th>
+                <th>
+                  <Tip label="SMA 50" tooltips={TOOLTIPS} />
+                </th>
+                <th>
+                  <Tip label="SMA 200" tooltips={TOOLTIPS} />
+                </th>
+                <th>
+                  <Tip label="RSI" tooltips={TOOLTIPS} />
+                </th>
+                <th>
+                  <Tip label="MACD Hist" tooltips={TOOLTIPS} />
+                </th>
+                <th>
+                  <Tip label="ATR" tooltips={TOOLTIPS} />
+                </th>
+                <th>
+                  <Tip label="BB Low" tooltips={TOOLTIPS} />
+                </th>
+                <th>
+                  <Tip label="BB High" tooltips={TOOLTIPS} />
+                </th>
+                <th>
+                  <Tip label="Vol Ratio" tooltips={TOOLTIPS} />
+                </th>
+                <th>
+                  <Tip label="ROC 20d" tooltips={TOOLTIPS} />
+                </th>
               </tr>
             </thead>
             <tbody>
               {Object.entries(technicals).map(([ticker, data]) => {
-                if (data.error) return (
-                  <tr key={ticker}>
-                    <td style={{ fontWeight: 600 }}>{ticker}</td>
-                    <td colSpan={11} style={{ color: "var(--text-muted)" }}>{String(data.error)}</td>
-                  </tr>
-                );
-                const rsi = data.rsi_14 as number | null;
-                const rsiColor = rsi != null ? (rsi > 70 ? "var(--red)" : rsi < 30 ? "var(--green)" : "inherit") : "inherit";
+                if (data.error) {
+                  return (
+                    <tr key={ticker}>
+                      <td style={{ fontWeight: 600 }}>{ticker}</td>
+                      <td colSpan={11} style={{ color: "var(--text-muted)" }}>
+                        {String(data.error)}
+                      </td>
+                    </tr>
+                  );
+                }
                 const macdH = data.macd_histogram as number | null;
-                const macdColor = macdH != null ? (macdH > 0 ? "var(--green)" : "var(--red)") : "inherit";
+                const rsi = data.rsi_14 as number | null;
+                const macdColor =
+                  macdH != null ? (macdH > 0 ? "var(--green)" : "var(--red)") : "inherit";
+                const rsiColor =
+                  rsi != null
+                    ? rsi > 70
+                      ? "var(--red)"
+                      : rsi < 30
+                        ? "var(--green)"
+                        : "inherit"
+                    : "inherit";
                 return (
                   <tr key={ticker}>
                     <td style={{ fontWeight: 600 }}>{ticker}</td>
@@ -149,7 +210,11 @@ export default function Technicals() {
                     <td>{data.bb_lower ?? "—"}</td>
                     <td>{data.bb_upper ?? "—"}</td>
                     <td>{data.volume_ratio ?? "—"}</td>
-                    <td style={{ color: (data.roc_20 as number) > 0 ? "var(--green)" : "var(--red)" }}>
+                    <td
+                      style={{
+                        color: (data.roc_20 as number) > 0 ? "var(--green)" : "var(--red)",
+                      }}
+                    >
                       {data.roc_20 != null ? `${data.roc_20}%` : "—"}
                     </td>
                   </tr>
@@ -160,7 +225,7 @@ export default function Technicals() {
         </div>
       </div>
 
-      <button onClick={load} style={{ alignSelf: "center", padding: "0.5rem 1.5rem", cursor: "pointer" }}>
+      <button className={styles.refreshButton} onClick={load}>
         Refresh
       </button>
     </div>

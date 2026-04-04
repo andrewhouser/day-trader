@@ -1,4 +1,4 @@
-import Technicals from "@/components/Technicals";
+import { Technicals } from "@/components/Technicals";
 
 export default function TechnicalsPage() {
   return <Technicals />;

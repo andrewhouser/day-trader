@@ -2,29 +2,48 @@
 
 import { useState } from "react";
 
-interface ScheduleEditorProps {
+import styles from "./ScheduleEditor.module.css";
+
+interface Props {
+  currentCron: string;
+  onClose: () => void;
+  onSave: (taskId: string, cron: string) => Promise<void>;
   taskId: string;
   taskName: string;
-  currentCron: string;
-  onSave: (taskId: string, cron: string) => Promise<void>;
-  onClose: () => void;
 }
 
-type FrequencyType = "every_n_min" | "times_per_day" | "daily" | "weekly";
+type FrequencyType = "daily" | "every_n_min" | "times_per_day" | "weekly";
 
 interface ScheduleState {
-  frequency: FrequencyType;
-  intervalMin: number;
-  hourStart: number;
-  hourEnd: number;
-  times: number[];
   dailyHour: number;
   dailyMin: number;
   days: number[];
+  frequency: FrequencyType;
+  hourEnd: number;
+  hourStart: number;
+  intervalMin: number;
+  times: number[];
 }
 
 const DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const DAY_VALUES = [1, 2, 3, 4, 5, 6, 0];
+
+function describeSchedule(s: ScheduleState): string {
+  const dayNames = s.days.map((d) => DAY_LABELS[DAY_VALUES.indexOf(d)] ?? d).join(", ");
+  switch (s.frequency) {
+    case "every_n_min":
+      return `Every ${s.intervalMin} min, ${fmtHour(s.hourStart)}–${fmtHour(s.hourEnd)}, ${dayNames}`;
+    case "times_per_day": {
+      const timeStr = [...s.times].sort((a, b) => a - b).map(fmtHour).join(", ");
+      return `${timeStr}, ${dayNames}`;
+    }
+    case "daily":
+    case "weekly": {
+      const m = s.dailyMin > 0 ? `:${s.dailyMin.toString().padStart(2, "0")}` : "";
+      return `${fmtHour(s.dailyHour)}${m}, ${dayNames}`;
+    }
+  }
+}
 
 function fmtHour(h: number): string {
   if (h === 0) return "12 AM";
@@ -35,21 +54,20 @@ function fmtHour(h: number): string {
 
 function parseCronToState(cron: string): ScheduleState {
   const defaults: ScheduleState = {
-    frequency: "daily",
-    intervalMin: 10,
-    hourStart: 9,
-    hourEnd: 16,
-    times: [8],
     dailyHour: 7,
     dailyMin: 0,
     days: [1, 2, 3, 4, 5],
+    frequency: "daily",
+    hourEnd: 16,
+    hourStart: 9,
+    intervalMin: 10,
+    times: [8],
   };
 
   const parts = cron.trim().split(/\s+/);
   if (parts.length !== 5) return defaults;
   const [minute, hour, , , dow] = parts;
 
-  // Parse days
   let days = [1, 2, 3, 4, 5];
   if (dow !== "*") {
     const range = dow.match(/^(\d)-(\d)$/);
@@ -65,54 +83,50 @@ function parseCronToState(cron: string): ScheduleState {
     }
   }
 
-  // Every N minutes: */3 or 5/10
   const everyN = minute.match(/^\*\/(\d+)$/) || minute.match(/^\d+\/(\d+)$/);
   if (everyN) {
     const hourRange = hour.match(/^(\d+)-(\d+)$/);
     return {
       ...defaults,
-      frequency: "every_n_min",
-      intervalMin: parseInt(everyN[1]),
-      hourStart: hourRange ? parseInt(hourRange[1]) : 9,
-      hourEnd: hourRange ? parseInt(hourRange[2]) : 16,
       days,
+      frequency: "every_n_min",
+      hourEnd: hourRange ? parseInt(hourRange[2]) : 16,
+      hourStart: hourRange ? parseInt(hourRange[1]) : 9,
+      intervalMin: parseInt(everyN[1]),
     };
   }
 
-  // Comma minutes with hour range: 0,30 9-16
   if (minute.includes(",") && hour.includes("-")) {
     const mins = minute.split(",").map(Number);
     const interval = mins.length === 2 && mins[0] === 0 ? mins[1] : 30;
     const hourRange = hour.match(/^(\d+)-(\d+)$/);
     return {
       ...defaults,
-      frequency: "every_n_min",
-      intervalMin: interval,
-      hourStart: hourRange ? parseInt(hourRange[1]) : 9,
-      hourEnd: hourRange ? parseInt(hourRange[2]) : 16,
       days,
+      frequency: "every_n_min",
+      hourEnd: hourRange ? parseInt(hourRange[2]) : 16,
+      hourStart: hourRange ? parseInt(hourRange[1]) : 9,
+      intervalMin: interval,
     };
   }
 
-  // Multiple hours: 0 8,12,16
   if (/^\d+$/.test(minute) && hour.includes(",")) {
     return {
       ...defaults,
-      frequency: "times_per_day",
-      times: hour.split(",").map(Number),
       dailyMin: parseInt(minute),
       days,
+      frequency: "times_per_day",
+      times: hour.split(",").map(Number),
     };
   }
 
-  // Single time: 0 7
   if (/^\d+$/.test(minute) && /^\d+$/.test(hour)) {
     const h = parseInt(hour);
     const m = parseInt(minute);
     if (days.length === 1 || (dow !== "*" && !dow.includes("-") && !dow.includes(","))) {
-      return { ...defaults, frequency: "weekly", dailyHour: h, dailyMin: m, days };
+      return { ...defaults, dailyHour: h, dailyMin: m, days, frequency: "weekly" };
     }
-    return { ...defaults, frequency: "daily", dailyHour: h, dailyMin: m, days };
+    return { ...defaults, dailyHour: h, dailyMin: m, days, frequency: "daily" };
   }
 
   return defaults;
@@ -120,7 +134,6 @@ function parseCronToState(cron: string): ScheduleState {
 
 function stateToCron(s: ScheduleState): string {
   const dayStr = s.days.length === 7 ? "*" : s.days.join(",");
-
   switch (s.frequency) {
     case "every_n_min":
       return `*/${s.intervalMin} ${s.hourStart}-${s.hourEnd} * * ${dayStr}`;
@@ -134,41 +147,10 @@ function stateToCron(s: ScheduleState): string {
   }
 }
 
-function describeSchedule(s: ScheduleState): string {
-  const dayNames = s.days.map((d) => DAY_LABELS[DAY_VALUES.indexOf(d)] ?? d).join(", ");
-
-  switch (s.frequency) {
-    case "every_n_min":
-      return `Every ${s.intervalMin} min, ${fmtHour(s.hourStart)}–${fmtHour(s.hourEnd)}, ${dayNames}`;
-    case "times_per_day": {
-      const sorted = [...s.times].sort((a, b) => a - b);
-      const timeStr = sorted.map(fmtHour).join(", ");
-      return `${timeStr}, ${dayNames}`;
-    }
-    case "daily":
-    case "weekly": {
-      const m = s.dailyMin > 0 ? `:${s.dailyMin.toString().padStart(2, "0")}` : "";
-      return `${fmtHour(s.dailyHour)}${m}, ${dayNames}`;
-    }
-  }
-}
-
-export default function ScheduleEditor({ taskId, taskName, currentCron, onSave, onClose }: ScheduleEditorProps) {
-  const [state, setState] = useState<ScheduleState>(() => parseCronToState(currentCron));
-  const [saving, setSaving] = useState(false);
+export function ScheduleEditor({ currentCron, onClose, onSave, taskId, taskName }: Props) {
   const [error, setError] = useState("");
-
-  function update(patch: Partial<ScheduleState>) {
-    setState((prev) => ({ ...prev, ...patch }));
-  }
-
-  function toggleDay(day: number) {
-    setState((prev) => {
-      const has = prev.days.includes(day);
-      const next = has ? prev.days.filter((d) => d !== day) : [...prev.days, day].sort((a, b) => a - b);
-      return { ...prev, days: next.length > 0 ? next : prev.days };
-    });
-  }
+  const [saving, setSaving] = useState(false);
+  const [state, setState] = useState<ScheduleState>(() => parseCronToState(currentCron));
 
   function addTime() {
     setState((prev) => {
@@ -177,6 +159,19 @@ export default function ScheduleEditor({ taskId, taskName, currentCron, onSave, 
       if (last + 2 <= 23) next.push(last + 2);
       return { ...prev, times: next };
     });
+  }
+
+  async function handleSave() {
+    setError("");
+    setSaving(true);
+    try {
+      await onSave(taskId, stateToCron(state));
+      onClose();
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Failed to save");
+    } finally {
+      setSaving(false);
+    }
   }
 
   function removeTime(idx: number) {
@@ -194,119 +189,183 @@ export default function ScheduleEditor({ taskId, taskName, currentCron, onSave, 
     });
   }
 
-  async function handleSave() {
-    setSaving(true);
-    setError("");
-    try {
-      await onSave(taskId, stateToCron(state));
-      onClose();
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Failed to save");
-    } finally {
-      setSaving(false);
-    }
+  function toggleDay(day: number) {
+    setState((prev) => {
+      const has = prev.days.includes(day);
+      const next = has
+        ? prev.days.filter((d) => d !== day)
+        : [...prev.days, day].sort((a, b) => a - b);
+      return { ...prev, days: next.length > 0 ? next : prev.days };
+    });
   }
 
-  const preview = describeSchedule(state);
+  function update(patch: Partial<ScheduleState>) {
+    setState((prev) => ({ ...prev, ...patch }));
+  }
+
   const cronPreview = stateToCron(state);
+  const preview = describeSchedule(state);
 
   return (
-    <div className="modal-overlay" onClick={onClose} role="dialog" aria-modal="true" aria-label={`Edit schedule for ${taskName}`}>
+    <div
+      aria-label={`Edit schedule for ${taskName}`}
+      aria-modal="true"
+      className="modal-overlay"
+      onClick={onClose}
+      role="dialog"
+    >
       <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
-          <div style={{ fontWeight: 600, fontSize: "1.05rem" }}>Edit Schedule: {taskName}</div>
-          <button onClick={onClose} style={{ background: "none", border: "none", color: "var(--text-muted)", fontSize: "1.2rem", cursor: "pointer", padding: "0.25rem" }} aria-label="Close">✕</button>
+        <div className={styles.header}>
+          <div className={styles.headerTitle}>Edit Schedule: {taskName}</div>
+          <button aria-label="Close" className={styles.closeButton} onClick={onClose}>
+            ✕
+          </button>
         </div>
 
-        {/* Frequency type */}
-        <div className="sched-field">
-          <label className="sched-label">Frequency</label>
-          <select value={state.frequency} onChange={(e) => update({ frequency: e.target.value as FrequencyType })} className="sched-select">
+        <div className={styles.schedField}>
+          <label className={styles.schedLabel}>Frequency</label>
+          <select
+            className={styles.schedSelect}
+            onChange={(e) => update({ frequency: e.target.value as FrequencyType })}
+            value={state.frequency}
+          >
+            <option value="daily">Once daily</option>
             <option value="every_n_min">Every N minutes</option>
             <option value="times_per_day">Specific times per day</option>
-            <option value="daily">Once daily</option>
             <option value="weekly">Once weekly</option>
           </select>
         </div>
 
-        {/* Interval options */}
         {state.frequency === "every_n_min" && (
           <>
-            <div className="sched-field">
-              <label className="sched-label">Every</label>
-              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                <select value={state.intervalMin} onChange={(e) => update({ intervalMin: parseInt(e.target.value) })} className="sched-select" style={{ width: "auto" }}>
+            <div className={styles.schedField}>
+              <label className={styles.schedLabel}>Every</label>
+              <div className={styles.inlineRow}>
+                <select
+                  className={styles.schedSelectAuto}
+                  onChange={(e) => update({ intervalMin: parseInt(e.target.value) })}
+                  value={state.intervalMin}
+                >
                   {[1, 2, 3, 5, 10, 15, 20, 30].map((n) => (
-                    <option key={n} value={n}>{n}</option>
+                    <option key={n} value={n}>
+                      {n}
+                    </option>
                   ))}
                 </select>
                 <span>minutes</span>
               </div>
             </div>
-            <div className="sched-field">
-              <label className="sched-label">Between</label>
-              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                <select value={state.hourStart} onChange={(e) => update({ hourStart: parseInt(e.target.value) })} className="sched-select" style={{ width: "auto" }}>
-                  {Array.from({ length: 24 }, (_, i) => <option key={i} value={i}>{fmtHour(i)}</option>)}
+            <div className={styles.schedField}>
+              <label className={styles.schedLabel}>Between</label>
+              <div className={styles.inlineRow}>
+                <select
+                  className={styles.schedSelectAuto}
+                  onChange={(e) => update({ hourStart: parseInt(e.target.value) })}
+                  value={state.hourStart}
+                >
+                  {Array.from({ length: 24 }, (_, i) => (
+                    <option key={i} value={i}>
+                      {fmtHour(i)}
+                    </option>
+                  ))}
                 </select>
                 <span>and</span>
-                <select value={state.hourEnd} onChange={(e) => update({ hourEnd: parseInt(e.target.value) })} className="sched-select" style={{ width: "auto" }}>
-                  {Array.from({ length: 24 }, (_, i) => <option key={i} value={i}>{fmtHour(i)}</option>)}
+                <select
+                  className={styles.schedSelectAuto}
+                  onChange={(e) => update({ hourEnd: parseInt(e.target.value) })}
+                  value={state.hourEnd}
+                >
+                  {Array.from({ length: 24 }, (_, i) => (
+                    <option key={i} value={i}>
+                      {fmtHour(i)}
+                    </option>
+                  ))}
                 </select>
               </div>
             </div>
           </>
         )}
 
-        {/* Specific times */}
         {state.frequency === "times_per_day" && (
-          <div className="sched-field">
-            <label className="sched-label">Run at</label>
-            <div style={{ display: "flex", flexDirection: "column", gap: "0.35rem" }}>
+          <div className={styles.schedField}>
+            <label className={styles.schedLabel}>Run at</label>
+            <div className={styles.timesColumn}>
               {state.times.map((t, i) => (
-                <div key={i} style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                  <select value={t} onChange={(e) => setTime(i, parseInt(e.target.value))} className="sched-select" style={{ width: "auto" }}>
-                    {Array.from({ length: 24 }, (_, h) => <option key={h} value={h}>{fmtHour(h)}</option>)}
+                <div className={styles.timesRow} key={i}>
+                  <select
+                    className={styles.schedSelectAuto}
+                    onChange={(e) => setTime(i, parseInt(e.target.value))}
+                    value={t}
+                  >
+                    {Array.from({ length: 24 }, (_, h) => (
+                      <option key={h} value={h}>
+                        {fmtHour(h)}
+                      </option>
+                    ))}
                   </select>
                   {state.times.length > 1 && (
-                    <button onClick={() => removeTime(i)} style={{ background: "none", border: "none", color: "var(--red)", cursor: "pointer", fontSize: "0.9rem", padding: "0.2rem" }}>✕</button>
+                    <button
+                      className={styles.removeTimeButton}
+                      onClick={() => removeTime(i)}
+                    >
+                      ✕
+                    </button>
                   )}
                 </div>
               ))}
-              <button onClick={addTime} style={{ alignSelf: "flex-start", fontSize: "0.8rem", padding: "0.25rem 0.5rem" }}>+ Add time</button>
+              <button
+                onClick={addTime}
+                style={{ alignSelf: "flex-start", fontSize: "0.8rem", padding: "0.25rem 0.5rem" }}
+              >
+                + Add time
+              </button>
             </div>
           </div>
         )}
 
-        {/* Daily / Weekly time */}
         {(state.frequency === "daily" || state.frequency === "weekly") && (
-          <div className="sched-field">
-            <label className="sched-label">Time</label>
-            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-              <select value={state.dailyHour} onChange={(e) => update({ dailyHour: parseInt(e.target.value) })} className="sched-select" style={{ width: "auto" }}>
-                {Array.from({ length: 24 }, (_, i) => <option key={i} value={i}>{fmtHour(i)}</option>)}
+          <div className={styles.schedField}>
+            <label className={styles.schedLabel}>Time</label>
+            <div className={styles.inlineRow}>
+              <select
+                className={styles.schedSelectAuto}
+                onChange={(e) => update({ dailyHour: parseInt(e.target.value) })}
+                value={state.dailyHour}
+              >
+                {Array.from({ length: 24 }, (_, i) => (
+                  <option key={i} value={i}>
+                    {fmtHour(i)}
+                  </option>
+                ))}
               </select>
               <span>:</span>
-              <select value={state.dailyMin} onChange={(e) => update({ dailyMin: parseInt(e.target.value) })} className="sched-select" style={{ width: "auto" }}>
-                {[0, 5, 10, 15, 20, 30, 45].map((m) => <option key={m} value={m}>{m.toString().padStart(2, "0")}</option>)}
+              <select
+                className={styles.schedSelectAuto}
+                onChange={(e) => update({ dailyMin: parseInt(e.target.value) })}
+                value={state.dailyMin}
+              >
+                {[0, 5, 10, 15, 20, 30, 45].map((m) => (
+                  <option key={m} value={m}>
+                    {m.toString().padStart(2, "0")}
+                  </option>
+                ))}
               </select>
             </div>
           </div>
         )}
 
-        {/* Day picker */}
-        <div className="sched-field">
-          <label className="sched-label">Days</label>
-          <div style={{ display: "flex", gap: "0.35rem", flexWrap: "wrap" }}>
+        <div className={styles.schedField}>
+          <label className={styles.schedLabel}>Days</label>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "0.35rem" }}>
             {DAY_LABELS.map((label, i) => {
               const val = DAY_VALUES[i];
               const active = state.days.includes(val);
               return (
                 <button
+                  className={`badge ${active ? "badge-blue" : "badge-gray"}`}
                   key={val}
                   onClick={() => toggleDay(val)}
-                  className={`badge ${active ? "badge-blue" : "badge-gray"}`}
-                  style={{ cursor: "pointer", padding: "0.35rem 0.6rem", border: "none", fontSize: "0.8rem" }}
+                  style={{ border: "none", cursor: "pointer", fontSize: "0.8rem", padding: "0.35rem 0.6rem" }}
                 >
                   {label}
                 </button>
@@ -315,19 +374,17 @@ export default function ScheduleEditor({ taskId, taskName, currentCron, onSave, 
           </div>
         </div>
 
-        {/* Preview */}
-        <div style={{ marginTop: "1rem", padding: "0.75rem", background: "rgba(255,255,255,0.03)", borderRadius: 6, border: "1px solid var(--border)" }}>
-          <div style={{ fontSize: "0.7rem", color: "var(--text-muted)", textTransform: "uppercase", marginBottom: "0.25rem" }}>Preview</div>
-          <div style={{ fontSize: "0.9rem" }}>{preview}</div>
-          <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: "0.15rem", fontFamily: "monospace" }}>{cronPreview}</div>
+        <div className={styles.preview}>
+          <div className={styles.previewLabel}>Preview</div>
+          <div className={styles.previewText}>{preview}</div>
+          <div className={styles.previewCron}>{cronPreview}</div>
         </div>
 
-        {error && <div style={{ color: "var(--red)", fontSize: "0.85rem", marginTop: "0.5rem" }}>{error}</div>}
+        {error && <div className={styles.error}>{error}</div>}
 
-        {/* Actions */}
-        <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.5rem", marginTop: "1rem" }}>
+        <div className={styles.footer}>
           <button onClick={onClose}>Cancel</button>
-          <button className="primary" onClick={handleSave} disabled={saving}>
+          <button className="primary" disabled={saving} onClick={handleSave}>
             {saving ? "Saving..." : "Save Schedule"}
           </button>
         </div>

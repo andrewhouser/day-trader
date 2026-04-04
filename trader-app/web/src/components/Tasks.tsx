@@ -1,22 +1,25 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
-import { api, TaskInfo, TaskHistoryEntry } from "@/lib/api";
-import { cronToHuman } from "@/lib/cron";
-import ScheduleEditor from "./ScheduleEditor";
+import { useCallback, useEffect, useState } from "react";
 
-export default function Tasks() {
-  const [tasks, setTasks] = useState<TaskInfo[]>([]);
-  const [history, setHistory] = useState<TaskHistoryEntry[]>([]);
-  const [loading, setLoading] = useState(true);
+import { api, TaskHistoryEntry, TaskInfo } from "@/lib/api";
+import { cronToHuman } from "@/lib/cron";
+
+import { ScheduleEditor } from "./ScheduleEditor";
+import styles from "./Tasks.module.css";
+
+export function Tasks() {
   const [actionMsg, setActionMsg] = useState("");
   const [editingTask, setEditingTask] = useState<TaskInfo | null>(null);
+  const [history, setHistory] = useState<TaskHistoryEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [tasks, setTasks] = useState<TaskInfo[]>([]);
 
   const load = useCallback(async () => {
     try {
       const [t, h] = await Promise.all([api.getTasks(), api.getTaskHistory()]);
-      setTasks(t);
       setHistory(h);
+      setTasks(t);
     } catch {
       /* ignore */
     }
@@ -39,6 +42,12 @@ export default function Tasks() {
     }
   }
 
+  async function handleScheduleSave(taskId: string, cron: string) {
+    await api.updateTaskSchedule(taskId, cron);
+    setActionMsg(`Schedule updated for ${taskId}`);
+    await load();
+  }
+
   async function handleStop(taskId: string) {
     try {
       setActionMsg("");
@@ -50,38 +59,45 @@ export default function Tasks() {
     }
   }
 
-  async function handleScheduleSave(taskId: string, cron: string) {
-    await api.updateTaskSchedule(taskId, cron);
-    setActionMsg(`Schedule updated for ${taskId}`);
-    await load();
+  if (loading) {
+    return (
+      <div className="empty-state">
+        <span className="spinner" /> Loading tasks...
+      </div>
+    );
   }
 
-  if (loading) return <div className="empty-state"><span className="spinner" /> Loading tasks...</div>;
-
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "1rem", paddingBottom: "2rem" }}>
+    <div className={styles.container}>
       {actionMsg && (
-        <div className="card" style={{ padding: "0.75rem", fontSize: "0.85rem", color: "var(--blue)" }}>
-          {actionMsg}
-        </div>
+        <div className={`card ${styles.actionMsg}`}>{actionMsg}</div>
       )}
 
       <div className="section-title">Agent Tasks</div>
       <div className="grid-2">
         {tasks.map((task) => (
-          <div key={task.task_id} className="card">
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "0.75rem" }}>
+          <div className="card" key={task.task_id}>
+            <div className={styles.taskCardHeader}>
               <div>
-                <div style={{ fontWeight: 600, marginBottom: "0.25rem" }}>{task.name}</div>
-                <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
-                  <span style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>{cronToHuman(task.cron)}</span>
+                <div className={styles.taskName}>{task.name}</div>
+                <div className={styles.taskScheduleRow}>
+                  <span className={styles.taskScheduleText}>{cronToHuman(task.cron)}</span>
                   <button
-                    onClick={() => setEditingTask(task)}
-                    style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", padding: "0.1rem 0.25rem", fontSize: "0.75rem", lineHeight: 1 }}
-                    title="Edit schedule"
                     aria-label={`Edit schedule for ${task.name}`}
+                    className={styles.editButton}
+                    onClick={() => setEditingTask(task)}
+                    title="Edit schedule"
                   >
-                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
+                    <svg
+                      fill="none"
+                      height="12"
+                      stroke="currentColor"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="1.3"
+                      viewBox="0 0 12 12"
+                      width="12"
+                    >
                       <path d="M8.5 1.5l2 2L3.5 10.5H1.5v-2z" />
                       <path d="M7 3l2 2" />
                     </svg>
@@ -89,39 +105,47 @@ export default function Tasks() {
                 </div>
               </div>
               {task.is_running ? (
-                <span className="badge badge-yellow">Running <span className="spinner" style={{ marginLeft: 4 }} /></span>
+                <span className="badge badge-yellow">
+                  Running <span className="spinner" style={{ marginLeft: 4 }} />
+                </span>
               ) : (
                 <span className="badge badge-green">Idle</span>
               )}
             </div>
 
-            <div style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginBottom: "0.75rem" }}>
+            <div className={styles.taskMeta}>
               Last run: {task.last_run ? new Date(task.last_run.started_at).toLocaleString() : "Never"}
               {task.last_run?.finished_at && (
                 <> · Finished: {new Date(task.last_run.finished_at).toLocaleString()}</>
               )}
               {task.last_run?.status && (
-                <> · <span className={`badge ${task.last_run.status === "completed" ? "badge-green" : task.last_run.status === "failed" || task.last_run.status === "cancelled" ? "badge-red" : "badge-yellow"}`}>
-                  {task.last_run.status}
-                </span></>
+                <>
+                  {" "}
+                  ·{" "}
+                  <span
+                    className={`badge ${task.last_run.status === "completed" ? "badge-green" : task.last_run.status === "failed" || task.last_run.status === "cancelled" ? "badge-red" : "badge-yellow"}`}
+                  >
+                    {task.last_run.status}
+                  </span>
+                </>
               )}
               {task.last_run?.error && (
-                <div style={{ color: "var(--red)", marginTop: "0.25rem" }}>Error: {task.last_run.error}</div>
+                <div className={styles.errorText}>Error: {task.last_run.error}</div>
               )}
             </div>
 
-            <div style={{ display: "flex", gap: "0.5rem" }}>
+            <div className={styles.taskActions}>
               <button
                 className="primary"
-                onClick={() => handleRun(task.task_id)}
                 disabled={task.is_running}
+                onClick={() => handleRun(task.task_id)}
               >
                 ▶ Run Now
               </button>
               <button
                 className="danger"
-                onClick={() => handleStop(task.task_id)}
                 disabled={!task.is_running}
+                onClick={() => handleStop(task.task_id)}
               >
                 ■ Stop
               </button>
@@ -130,11 +154,12 @@ export default function Tasks() {
         ))}
       </div>
 
-      {/* Execution History */}
       <div className="section-title" style={{ marginTop: "0.5rem" }}>Execution History</div>
-      <div className="card" style={{ padding: 0, overflow: "hidden" }}>
+      <div className={`card ${styles.historyCard}`}>
         {history.length === 0 ? (
-          <div className="empty-state" style={{ padding: "1.5rem" }}>No task executions yet</div>
+          <div className="empty-state" style={{ padding: "1.5rem" }}>
+            No task executions yet
+          </div>
         ) : (
           <table>
             <thead>
@@ -149,17 +174,21 @@ export default function Tasks() {
             <tbody>
               {history.map((entry, i) => (
                 <tr key={i}>
-                  <td style={{ fontWeight: 600 }}>{entry.task_name}</td>
+                  <td className={styles.historyNameCell}>{entry.task_name}</td>
                   <td>
-                    <span className={`badge ${entry.status === "completed" ? "badge-green" : entry.status === "failed" || entry.status === "cancelled" ? "badge-red" : "badge-yellow"}`}>
+                    <span
+                      className={`badge ${entry.status === "completed" ? "badge-green" : entry.status === "failed" || entry.status === "cancelled" ? "badge-red" : "badge-yellow"}`}
+                    >
                       {entry.status}
                     </span>
                   </td>
-                  <td style={{ fontSize: "0.8rem" }}>{new Date(entry.started_at).toLocaleString()}</td>
-                  <td style={{ fontSize: "0.8rem" }}>{entry.finished_at ? new Date(entry.finished_at).toLocaleString() : "—"}</td>
-                  <td style={{ fontSize: "0.8rem", color: "var(--red)", maxWidth: 300, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {entry.error || "—"}
+                  <td className={styles.historyDateCell}>
+                    {new Date(entry.started_at).toLocaleString()}
                   </td>
+                  <td className={styles.historyDateCell}>
+                    {entry.finished_at ? new Date(entry.finished_at).toLocaleString() : "—"}
+                  </td>
+                  <td className={styles.historyErrorCell}>{entry.error || "—"}</td>
                 </tr>
               ))}
             </tbody>
@@ -167,18 +196,15 @@ export default function Tasks() {
         )}
       </div>
 
-      <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", textAlign: "center" }}>
-        Auto-refreshes every 5s
-      </div>
+      <div className={styles.timestamp}>Auto-refreshes every 5s</div>
 
-      {/* Schedule Editor Modal */}
       {editingTask && (
         <ScheduleEditor
+          currentCron={editingTask.cron}
+          onClose={() => setEditingTask(null)}
+          onSave={handleScheduleSave}
           taskId={editingTask.task_id}
           taskName={editingTask.name}
-          currentCron={editingTask.cron}
-          onSave={handleScheduleSave}
-          onClose={() => setEditingTask(null)}
         />
       )}
     </div>

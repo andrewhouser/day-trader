@@ -1,0 +1,80 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding-bottom: 2rem;
+}
+
+.errorCard {
+  color: var(--red);
+}
+
+.overflowX {
+  overflow-x: auto;
+}
+
+.regimeBadge {
+  font-size: 1rem;
+  padding: 0.4rem 1rem;
+}
+
+.regimeRow {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.regimeSignals {
+  display: flex;
+  flex-wrap: wrap;
+  font-size: 0.85rem;
+  gap: 1.5rem;
+  margin-top: 0.75rem;
+}
+
+.regimeStrategyNote {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.refreshButton {
+  align-self: center;
+  cursor: pointer;
+  padding: 0.5rem 1.5rem;
+}
+
+.tipBubble {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  bottom: calc(100% + 6px);
+  color: var(--text);
+  font-size: 0.85rem;
+  font-weight: 400;
+  left: 50%;
+  line-height: 1.4;
+  max-width: 280px;
+  opacity: 0;
+  padding: 0.5rem 0.75rem;
+  pointer-events: none;
+  position: absolute;
+  text-transform: none;
+  transform: translateX(-50%);
+  transition: opacity 0.15s;
+  visibility: hidden;
+  white-space: normal;
+  width: max-content;
+  z-index: 100;
+}
+
+.tipWrapper {
+  border-bottom: 1px dashed var(--text-muted);
+  cursor: help;
+  position: relative;
+}
+
+.tipWrapper:hover .tipBubble {
+  opacity: 1;
+  visibility: visible;
+}

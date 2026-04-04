@@ -1,24 +1,38 @@
 "use client";
 
 import { useEffect, useState } from "react";
+
 import { api, TradeEntry } from "@/lib/api";
 
-export default function Trades() {
-  const [trades, setTrades] = useState<TradeEntry[]>([]);
+import styles from "./Trades.module.css";
+
+export function Trades() {
   const [expanded, setExpanded] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
+  const [trades, setTrades] = useState<TradeEntry[]>([]);
 
   useEffect(() => {
-    api.getTrades(100).then(setTrades).finally(() => setLoading(false));
+    api
+      .getTrades(100)
+      .then(setTrades)
+      .finally(() => setLoading(false));
   }, []);
 
-  if (loading) return <div className="empty-state"><span className="spinner" /> Loading trades...</div>;
-  if (trades.length === 0) return <div className="empty-state">No trades recorded yet.</div>;
+  if (loading) {
+    return (
+      <div className="empty-state">
+        <span className="spinner" /> Loading trades...
+      </div>
+    );
+  }
+  if (trades.length === 0) {
+    return <div className="empty-state">No trades recorded yet.</div>;
+  }
 
   return (
-    <div style={{ paddingBottom: "2rem" }}>
+    <div className={styles.container}>
       <div className="section-title">Trade Log ({trades.length} entries)</div>
-      <div className="card" style={{ padding: 0, overflow: "hidden" }}>
+      <div className={`card ${styles.tableCard}`}>
         <table>
           <thead>
             <tr>
@@ -35,32 +49,41 @@ export default function Trades() {
             {trades.map((trade, i) => (
               <>
                 <tr
+                  aria-expanded={expanded === i}
+                  className={styles.clickableRow}
                   key={i}
                   onClick={() => setExpanded(expanded === i ? null : i)}
-                  style={{ cursor: "pointer" }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ")
+                      setExpanded(expanded === i ? null : i);
+                  }}
                   role="button"
-                  aria-expanded={expanded === i}
                   tabIndex={0}
-                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") setExpanded(expanded === i ? null : i); }}
                 >
-                  <td style={{ fontSize: "0.8rem" }}>{trade.date || "—"}</td>
+                  <td className={styles.dateCell}>{trade.date || "—"}</td>
                   <td>
-                    {trade.action === "BUY" && <span className="badge badge-green">BUY</span>}
-                    {trade.action === "SELL" && <span className="badge badge-red">SELL</span>}
-                    {trade.action === "NO_ACTION" && <span className="badge badge-gray">HOLD</span>}
+                    {trade.action === "BUY" && (
+                      <span className="badge badge-green">BUY</span>
+                    )}
+                    {trade.action === "SELL" && (
+                      <span className="badge badge-red">SELL</span>
+                    )}
+                    {trade.action === "NO_ACTION" && (
+                      <span className="badge badge-gray">HOLD</span>
+                    )}
                     {!trade.action && <span className="badge badge-gray">—</span>}
                   </td>
-                  <td style={{ fontWeight: 600 }}>{trade.instrument || "—"}</td>
+                  <td className={styles.instrumentCell}>{trade.instrument || "—"}</td>
                   <td>{trade.quantity || "—"}</td>
                   <td>{trade.price || "—"}</td>
                   <td>{trade.realized_pnl || "—"}</td>
-                  <td style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>{trade.portfolio_balance || "—"}</td>
+                  <td className={styles.balanceCell}>{trade.portfolio_balance || "—"}</td>
                 </tr>
                 {expanded === i && (
                   <tr key={`${i}-detail`}>
-                    <td colSpan={7} style={{ background: "var(--bg)", padding: "1rem" }}>
-                      <div style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginBottom: "0.5rem" }}>Reasoning</div>
-                      <div style={{ fontSize: "0.85rem", whiteSpace: "pre-wrap" }}>
+                    <td className={styles.detailCell} colSpan={7}>
+                      <div className={styles.detailLabel}>Reasoning</div>
+                      <div className={styles.detailContent}>
                         {trade.reasoning || trade.raw}
                       </div>
                     </td>

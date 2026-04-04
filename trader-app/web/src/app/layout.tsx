@@ -1,27 +1,26 @@
 import type { Metadata } from "next";
+
+import { IndexTracker } from "@/components/IndexTracker";
+import { Nav } from "@/components/Nav";
+
 import "./globals.css";
-import Nav from "@/components/Nav";
-import IndexTracker from "@/components/IndexTracker";
+import styles from "./layout.module.css";
 
 export const metadata: Metadata = {
-  title: "Day Trader Agent",
   description: "Simulated day-trading agent dashboard",
+  title: "Day Trader Agent",
 };
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
       <body>
-        <header style={{ padding: "1rem 1.5rem", borderBottom: "1px solid var(--border)" }}>
-          <div className="container" style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
-              <span style={{ fontSize: "1.25rem" }}>📈</span>
-              <span style={{ fontWeight: 700, fontSize: "1.1rem" }}>Day Trader Agent</span>
-              <span style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>Paper Trading Simulation</span>
+        <header className={styles.header}>
+          <div className={`container ${styles.headerContent}`}>
+            <div className={styles.headerLogo}>
+              <span className={styles.headerLogoEmoji}>📈</span>
+              <span className={styles.headerTitle}>Day Trader Agent</span>
+              <span className={styles.headerSubtitle}>Paper Trading Simulation</span>
             </div>
           </div>
         </header>

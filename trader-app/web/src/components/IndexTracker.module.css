@@ -1,0 +1,64 @@
+.indexTracker {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  display: flex;
+  gap: 0;
+  margin-bottom: 1rem;
+  overflow-x: auto;
+}
+
+.indexItem {
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+  padding: 0.6rem 1rem;
+  white-space: nowrap;
+}
+
+.indexItem:last-child {
+  border-right: none;
+}
+
+.indexMuted {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.indexName {
+  color: var(--text-muted);
+  font-size: 0.65rem;
+  letter-spacing: 0.04em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+}
+
+.indexDown {
+  color: var(--red);
+  font-size: 0.75rem;
+}
+
+.indexPrice {
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.indexUp {
+  color: var(--green);
+  font-size: 0.75rem;
+}
+
+@media (max-width: 900px) {
+  .indexTracker {
+    flex-wrap: wrap;
+  }
+
+  .indexItem {
+    border-bottom: 1px solid var(--border);
+    flex: 1 1 45%;
+  }
+}

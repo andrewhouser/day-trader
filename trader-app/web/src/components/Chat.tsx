@@ -1,20 +1,23 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
+
 import { api } from "@/lib/api";
 
+import styles from "./Chat.module.css";
+
 interface Message {
-  role: "user" | "assistant";
   content: string;
+  role: "assistant" | "user";
   timestamp: Date;
 }
 
-export default function Chat() {
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [input, setInput] = useState("");
-  const [loading, setLoading] = useState(false);
+export function Chat() {
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const [input, setInput] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [messages, setMessages] = useState<Message[]>([]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -24,29 +27,29 @@ export default function Chat() {
     const text = input.trim();
     if (!text || loading) return;
 
-    const userMsg: Message = { role: "user", content: text, timestamp: new Date() };
-    setMessages((prev) => [...prev, userMsg]);
+    const userMsg: Message = { content: text, role: "user", timestamp: new Date() };
     setInput("");
     setLoading(true);
+    setMessages((prev) => [...prev, userMsg]);
 
     try {
       const { response } = await api.chat(text);
       setMessages((prev) => [
         ...prev,
-        { role: "assistant", content: response, timestamp: new Date() },
+        { content: response, role: "assistant", timestamp: new Date() },
       ]);
     } catch (e: unknown) {
       setMessages((prev) => [
         ...prev,
         {
-          role: "assistant",
           content: `Error: ${e instanceof Error ? e.message : "Failed to get response"}`,
+          role: "assistant",
           timestamp: new Date(),
         },
       ]);
     } finally {
-      setLoading(false);
       inputRef.current?.focus();
+      setLoading(false);
     }
   }
 
@@ -58,77 +61,51 @@ export default function Chat() {
   }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "calc(100vh - 180px)", gap: "1rem", paddingBottom: "1rem" }}>
-      {/* Messages */}
-      <div className="card" style={{ flex: 1, overflowY: "auto", padding: "1rem", display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+    <div className={styles.container}>
+      <div className={`card ${styles.messagesArea}`}>
         {messages.length === 0 && (
-          <div className="empty-state" style={{ padding: "3rem 1rem" }}>
-            <div style={{ fontSize: "1.5rem", marginBottom: "0.5rem" }}>💬</div>
+          <div className="empty-state">
+            <div className={styles.welcomeEmoji}>💬</div>
             <div>Ask the agent about its trading decisions, positions, research, or strategy.</div>
-            <div style={{ fontSize: "0.8rem", marginTop: "0.75rem", color: "var(--text-muted)" }}>
-              Try: &quot;Why did you sell XLE?&quot; · &quot;What&apos;s your current thesis?&quot; · &quot;Explain the risk alerts&quot;
+            <div className={styles.welcomeHint}>
+              Try: &quot;Why did you sell XLE?&quot; · &quot;What&apos;s your current
+              thesis?&quot; · &quot;Explain the risk alerts&quot;
             </div>
           </div>
         )}
         {messages.map((msg, i) => (
           <div
+            className={msg.role === "user" ? styles.userMessage : styles.assistantMessage}
             key={i}
-            style={{
-              alignSelf: msg.role === "user" ? "flex-end" : "flex-start",
-              maxWidth: "80%",
-              background: msg.role === "user" ? "var(--blue)" : "var(--bg-card-hover)",
-              color: msg.role === "user" ? "#fff" : "var(--text)",
-              padding: "0.75rem 1rem",
-              borderRadius: msg.role === "user" ? "12px 12px 2px 12px" : "12px 12px 12px 2px",
-              fontSize: "0.9rem",
-              lineHeight: 1.6,
-              whiteSpace: "pre-wrap",
-              wordBreak: "break-word",
-            }}
           >
             {msg.content}
-            <div style={{ fontSize: "0.65rem", opacity: 0.5, marginTop: "0.35rem", textAlign: "right" }}>
-              {msg.timestamp.toLocaleTimeString()}
-            </div>
+            <div className={styles.timestamp}>{msg.timestamp.toLocaleTimeString()}</div>
           </div>
         ))}
         {loading && (
-          <div style={{ alignSelf: "flex-start", display: "flex", alignItems: "center", gap: "0.5rem", color: "var(--text-muted)", fontSize: "0.85rem" }}>
+          <div className={styles.thinkingRow}>
             <span className="spinner" /> Thinking...
           </div>
         )}
         <div ref={bottomRef} />
       </div>
 
-      {/* Input */}
-      <div style={{ display: "flex", gap: "0.5rem" }}>
+      <div className={styles.inputRow}>
         <textarea
-          ref={inputRef}
-          value={input}
+          aria-label="Chat message input"
+          className={styles.textarea}
+          disabled={loading}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder="Ask about trades, positions, strategy..."
+          ref={inputRef}
           rows={2}
-          disabled={loading}
-          aria-label="Chat message input"
-          style={{
-            flex: 1,
-            background: "var(--bg-card)",
-            color: "var(--text)",
-            border: "1px solid var(--border)",
-            borderRadius: "8px",
-            padding: "0.75rem 1rem",
-            fontSize: "0.9rem",
-            resize: "none",
-            fontFamily: "inherit",
-            lineHeight: 1.5,
-          }}
+          value={input}
         />
         <button
-          className="primary"
-          onClick={handleSend}
+          className={`primary ${styles.sendButton}`}
           disabled={loading || !input.trim()}
-          style={{ alignSelf: "flex-end", padding: "0.75rem 1.25rem" }}
+          onClick={handleSend}
         >
           Send
         </button>

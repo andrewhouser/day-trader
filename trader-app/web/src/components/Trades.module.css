@@ -1,0 +1,41 @@
+.balanceCell {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
+.clickableRow {
+  cursor: pointer;
+}
+
+.container {
+  padding-bottom: 2rem;
+}
+
+.dateCell {
+  font-size: 0.8rem;
+}
+
+.detailCell {
+  background: var(--bg);
+  padding: 1rem;
+}
+
+.detailContent {
+  font-size: 0.85rem;
+  white-space: pre-wrap;
+}
+
+.detailLabel {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  margin-bottom: 0.5rem;
+}
+
+.instrumentCell {
+  font-weight: 600;
+}
+
+.tableCard {
+  overflow: hidden;
+  padding: 0;
+}
