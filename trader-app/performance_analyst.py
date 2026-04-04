@@ -296,6 +296,12 @@ Be quantitative. Use the actual numbers. Don't be vague."""
 
     logger.info("Sending performance analysis prompt to LLM...")
     response = call_ollama(prompt, system=PERFORMANCE_SYSTEM, model=config.RESEARCH_MODEL, timeout=config.RESEARCH_TIMEOUT)
+
+    # Retry once if the first attempt failed (Ollama may have been loading the model)
+    if response.startswith("[ERROR]"):
+        logger.warning("First performance LLM call failed, retrying...")
+        response = call_ollama(prompt, system=PERFORMANCE_SYSTEM, model=config.RESEARCH_MODEL, timeout=config.RESEARCH_TIMEOUT)
+
     logger.info(f"Performance analysis received ({len(response)} chars)")
 
     now = datetime.now()

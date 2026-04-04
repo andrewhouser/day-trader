@@ -5,6 +5,61 @@
   padding-bottom: 2rem;
 }
 
+.errorBanner {
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  border-radius: 6px;
+  color: var(--red);
+  font-size: 0.85rem;
+  margin-top: 1rem;
+  padding: 0.75rem 1rem;
+}
+
+.errorDetail {
+  color: var(--text-muted);
+  font-family: monospace;
+  font-size: 0.75rem;
+  margin-top: 0.5rem;
+  word-break: break-all;
+}
+
+.errorIcon {
+  margin-right: 0.4rem;
+}
+
+.metricsGrid {
+  display: grid;
+  gap: 0.5rem;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  margin-top: 0.75rem;
+}
+
+.metricCard {
+  background: var(--card-bg, rgba(255, 255, 255, 0.03));
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.08));
+  border-radius: 6px;
+  padding: 0.6rem 0.75rem;
+}
+
+.metricLabel {
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.metricValue {
+  font-size: 1.15rem;
+  font-weight: 700;
+  margin: 0.15rem 0;
+}
+
+.metricSub {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+}
+
 .overflowX {
   overflow-x: auto;
 }
@@ -15,4 +70,32 @@
 
 .weightCellModified {
   font-weight: 600;
+}
+
+.rawDetails {
+  border-top: 1px solid var(--border, rgba(255, 255, 255, 0.08));
+  margin-top: 1rem;
+  padding-top: 0.5rem;
+}
+
+.rawDetails summary {
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 0.75rem;
+}
+
+.rawPre {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 4px;
+  font-size: 0.75rem;
+  margin-top: 0.5rem;
+  max-height: 300px;
+  overflow: auto;
+  padding: 0.75rem;
+}
+
+.reportTitle {
+  font-size: 1rem;
+  font-weight: 600;
+  margin-bottom: 0.25rem;
 }
