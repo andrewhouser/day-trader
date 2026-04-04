@@ -10,7 +10,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY config.py market_data.py agent.py compactor.py scheduler.py api.py server.py entrypoint.sh ./
 COPY sentiment_agent.py risk_monitor.py rebalancer.py performance_analyst.py events_agent.py expansion.py ./
-COPY regime.py position_sizing.py ./
+COPY regime.py position_sizing.py score_weights.py stress_test.py ./
+COPY overseas_monitors.py exchange_calendar.py ./
 COPY research/ ./research/
 COPY trader/ ./trader/
 
