@@ -23,6 +23,8 @@ from performance_analyst import run_performance_analysis
 from events_agent import run_events_calendar
 from expansion import run_expansion_analysis, load_approved_into_config
 from overseas_monitors import run_nikkei_open, run_nikkei_reopen, run_ftse_open, run_europe_handoff
+from playbook_agent import run_playbook_update
+from market_context import update_market_context
 
 logging.basicConfig(
     level=logging.INFO,
@@ -140,6 +142,8 @@ JOBS = [
     ("rebalancer", "Portfolio Rebalancer", run_rebalancer, "REBALANCER_CRON", 600),
     ("performance", "Performance Analysis", run_performance_analysis, "PERFORMANCE_CRON", 600),
     ("expansion", "Portfolio Expansion", run_expansion_analysis, "EXPANSION_CRON", 600),
+    ("playbook", "Strategy Playbook", run_playbook_update, "PLAYBOOK_CRON", 900),
+    ("market_context", "Market Context", update_market_context, "MARKET_CONTEXT_CRON", 300),
 ]
 
 
