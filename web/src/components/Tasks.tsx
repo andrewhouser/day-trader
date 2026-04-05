@@ -10,6 +10,25 @@ import { ScheduleEditor } from "./ScheduleEditor";
 
 import styles from "./Tasks.module.css";
 
+const TASK_DESCRIPTIONS: Record<string, string> = {
+  nikkei_open: "Tracks the Tokyo Stock Exchange morning session. Monitors Nikkei 225 levels, yen dynamics, and BOJ signals. Emits trade signals for EWJ on significant moves.",
+  nikkei_reopen: "Tracks the Tokyo afternoon session after the midday break. Compares to the morning, captures momentum shifts, and prepares the Asia summary for Europe.",
+  ftse_open: "Tracks the London Stock Exchange open. Monitors FTSE 100, European sector rotation, GBP/EUR dynamics, and BOE/ECB signals. Emits trade signals for EWU/EWG.",
+  europe_handoff: "Synthesizes all overnight Asia and Europe data into a single pre-market briefing for the U.S. trading agent. Includes pending overseas trade signals.",
+  compaction: "Summarizes old research, trade logs, and reflections into compressed history files to prevent unbounded file growth and keep the agent's context focused.",
+  events: "Fetches upcoming economic events — Fed meetings, jobs reports, CPI, earnings — so the trading agent can avoid risky positions ahead of high-impact announcements.",
+  morning_report: "Generates the daily summary: portfolio status, overnight global recap from Asia and Europe, recent trades, performance reflection, and market outlook.",
+  research: "Gathers data from 7 sources (FRED, Finnhub, SEC EDGAR, and more), produces structured research notes, and triggers the trader if stop-loss or opportunity alerts fire.",
+  hourly_check: "The core trading cycle. Reads all available intelligence, scores each instrument on 6 dimensions, runs bear-case debate on large trades, and executes buy/sell decisions.",
+  sentiment: "Reads news headlines and classifies the overall market mood for each instrument as bullish, neutral, or bearish. Provides a qualitative signal for the trader.",
+  risk_monitor: "Watches positions every 3 minutes for trailing stop breaches, take-profit targets, portfolio drawdown, volatility spikes, and correlation concentration risk.",
+  rebalancer: "Weekly check on whether the portfolio has drifted from its target allocation. Suggests and executes trades to restore balance between asset classes.",
+  performance: "Weekly deep-dive into trade outcomes: win rate, profit factor, per-instrument breakdown, holding periods, and pattern detection. Updates adaptive score weights.",
+  expansion: "Evaluates potential new instruments for portfolio diversification. Generates proposals that require your approval before the trading agent can trade them.",
+  playbook: "Reads all trade history and reflections, extracts recurring strategy patterns with empirical win rates. Suspends strategies that consistently underperform.",
+  market_context: "Computes a rolling 30-day view of portfolio arc, regime transitions, trade statistics, best/worst instruments, and correlation structure.",
+};
+
 export function Tasks() {
   const [actionMsg, setActionMsg] = useState("");
   const [editingTask, setEditingTask] = useState<TaskInfo | null>(null);
@@ -87,6 +106,9 @@ export function Tasks() {
             <div className={styles.taskCardHeader}>
               <div>
                 <div className={styles.taskName}>{task.name}</div>
+                {TASK_DESCRIPTIONS[task.task_id] && (
+                  <div className={styles.taskDesc}>{TASK_DESCRIPTIONS[task.task_id]}</div>
+                )}
                 <div className={styles.taskScheduleRow}>
                   <span className={styles.taskScheduleText}>{cronToHuman(task.cron)}</span>
                   <button
