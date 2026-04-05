@@ -22,7 +22,10 @@ interface TabGroup {
 const TAB_GROUPS: TabGroup[] = [
   {
     label: "Overview",
-    tabs: [{ href: "/", label: "Dashboard" }],
+    tabs: [
+      { href: "/", label: "Dashboard" },
+      { href: "/learn", label: "Learn" },
+    ],
   },
   {
     label: "Trading",

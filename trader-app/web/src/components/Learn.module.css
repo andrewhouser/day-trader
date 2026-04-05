@@ -1,0 +1,189 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  padding-bottom: 3rem;
+}
+
+.hero {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.08), rgba(168, 85, 247, 0.06));
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 2rem;
+}
+
+.heroTitle {
+  font-size: 1.4rem;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+}
+
+.heroSub {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  line-height: 1.7;
+  max-width: 720px;
+}
+
+.sectionTitle {
+  align-items: center;
+  color: var(--text);
+  display: flex;
+  font-size: 1.1rem;
+  font-weight: 700;
+  gap: 0.5rem;
+  margin-bottom: 0.25rem;
+}
+
+.sectionIcon {
+  font-size: 1.2rem;
+}
+
+.conceptGrid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: 1fr 1fr;
+}
+
+@media (max-width: 768px) {
+  .conceptGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.conceptCard {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1.25rem;
+}
+
+.conceptName {
+  color: var(--text);
+  font-size: 0.9rem;
+  font-weight: 600;
+  margin-bottom: 0.35rem;
+}
+
+.conceptBody {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  line-height: 1.65;
+}
+
+.flowContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.flowStep {
+  align-items: flex-start;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  display: flex;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+}
+
+.flowNumber {
+  align-items: center;
+  background: rgba(59, 130, 246, 0.15);
+  border-radius: 50%;
+  color: var(--blue);
+  display: flex;
+  flex-shrink: 0;
+  font-size: 0.8rem;
+  font-weight: 700;
+  height: 28px;
+  justify-content: center;
+  width: 28px;
+}
+
+.flowContent {
+  flex: 1;
+}
+
+.flowLabel {
+  color: var(--text);
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin-bottom: 0.2rem;
+}
+
+.flowDesc {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  line-height: 1.6;
+}
+
+.flowTime {
+  color: var(--blue);
+  font-size: 0.7rem;
+  margin-top: 0.25rem;
+}
+
+.agentGrid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: 1fr 1fr 1fr;
+}
+
+@media (max-width: 900px) {
+  .agentGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.agentCard {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1rem 1.25rem;
+}
+
+.agentName {
+  color: var(--text);
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+}
+
+.agentRole {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  line-height: 1.6;
+}
+
+.glossaryGrid {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: 1fr 1fr;
+}
+
+@media (max-width: 768px) {
+  .glossaryGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.glossaryItem {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.85rem 1rem;
+}
+
+.glossaryTerm {
+  color: var(--text);
+  font-size: 0.82rem;
+  font-weight: 600;
+  margin-bottom: 0.15rem;
+}
+
+.glossaryDef {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  line-height: 1.55;
+}
