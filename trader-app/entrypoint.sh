@@ -6,18 +6,18 @@ echo "Checking Ollama connectivity..."
 
 OLLAMA_URL="${OLLAMA_BASE_URL:-http://host.docker.internal:11434}"
 
-# Wait for Ollama to be reachable
-MAX_RETRIES=30
+# Wait for Ollama to be reachable (quick check — don't block the API)
+MAX_RETRIES=5
 RETRY_COUNT=0
 until curl -sf "${OLLAMA_URL}/api/tags" > /dev/null 2>&1; do
     RETRY_COUNT=$((RETRY_COUNT + 1))
     if [ $RETRY_COUNT -ge $MAX_RETRIES ]; then
         echo "WARNING: Could not reach Ollama at ${OLLAMA_URL} after ${MAX_RETRIES} attempts"
-        echo "Starting anyway - agent tasks will fail until Ollama is available"
+        echo "Starting anyway — API will be available, agent tasks will fail until Ollama is reachable"
         break
     fi
     echo "Waiting for Ollama at ${OLLAMA_URL}... (attempt ${RETRY_COUNT}/${MAX_RETRIES})"
-    sleep 5
+    sleep 2
 done
 
 echo "Ollama check complete"
