@@ -9,7 +9,7 @@ services:
       - RESEARCH_MODEL=qwen3.5:latest
       - REPORT_MODEL=qwen2.5:7b
       - SENTIMENT_MODEL=llama3.1:8b
-      - EVENTS_MODEL=qwen3.5:latest
+      - EVENTS_MODEL=qwen2.5:7b
       - EXPANSION_MODEL=qwen3.5:latest
       - COMPACTION_MODEL=phi3:3.8b
       - TEMPERATURE=0.3
