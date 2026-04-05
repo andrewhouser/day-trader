@@ -5,13 +5,13 @@ services:
     restart: unless-stopped
     environment:
       - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
-      - TRADER_MODEL_NAME=deepseek-r1:14b
-      - RESEARCH_MODEL=qwen3.5:latest
-      - REPORT_MODEL=qwen2.5:7b
-      - SENTIMENT_MODEL=llama3.1:8b
-      - EVENTS_MODEL=qwen2.5:7b
-      - EXPANSION_MODEL=qwen3.5:latest
-      - COMPACTION_MODEL=phi3:3.8b
+      - TRADER_MODEL_NAME=${TRADER_MODEL_NAME:-deepseek-r1:14b}
+      - RESEARCH_MODEL=${RESEARCH_MODEL:-qwen3.5:latest}
+      - REPORT_MODEL=${REPORT_MODEL:-qwen2.5:7b}
+      - SENTIMENT_MODEL=${SENTIMENT_MODEL:-llama3.1:8b}
+      - EVENTS_MODEL=${EVENTS_MODEL:-qwen2.5:7b}
+      - EXPANSION_MODEL=${EXPANSION_MODEL:-qwen3.5:latest}
+      - COMPACTION_MODEL=${COMPACTION_MODEL:-phi3:3.8b}
       - TEMPERATURE=0.3
       - RESEARCH_TIMEOUT=600
       - EVENTS_TIMEOUT=600
