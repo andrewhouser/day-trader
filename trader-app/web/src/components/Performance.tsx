@@ -37,7 +37,7 @@ interface Metrics {
   total_realized_pnl: number;
   avg_win: number;
   avg_loss: number;
-  profit_factor: number;
+  profit_factor: number | null;
   portfolio_value: number;
   starting_capital: number;
   total_return_pct: number;
@@ -103,7 +103,7 @@ function MetricsSummary({ m }: { m: Metrics }) {
       </div>
       <div className={styles.metricCard}>
         <div className={styles.metricLabel}>Profit Factor</div>
-        <div className={styles.metricValue}>{m.profit_factor === Infinity || m.profit_factor > 999 ? "∞" : fmt(m.profit_factor)}</div>
+        <div className={styles.metricValue}>{m.profit_factor == null || m.profit_factor === Infinity || m.profit_factor > 999 ? "∞" : fmt(m.profit_factor)}</div>
       </div>
       <div className={styles.metricCard}>
         <div className={styles.metricLabel}>Max Drawdown</div>
