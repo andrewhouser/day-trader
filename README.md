@@ -436,7 +436,6 @@ To prevent unbounded file growth, a compaction agent runs daily at 5 AM and:
 Copy the example environment file and configure your Ollama URL and optional API keys:
 
 ```bash
-cd trader-app
 cp .env.example .env
 # Edit .env with your Ollama host URL and any API keys
 ```
@@ -495,7 +494,6 @@ environment:
 ### Running
 
 ```bash
-cd trader-app
 docker compose up -d
 ```
 
