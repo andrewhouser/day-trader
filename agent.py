@@ -84,9 +84,21 @@ def call_ollama(
 
 
 def load_portfolio() -> dict:
-    """Load portfolio state from disk."""
-    with open(config.PORTFOLIO_PATH, "r") as f:
-        return json.load(f)
+    """Load portfolio state from disk, returning a default if missing."""
+    try:
+        with open(config.PORTFOLIO_PATH, "r") as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {
+            "cash_usd": 1000.00,
+            "positions": [],
+            "total_value_usd": 1000.00,
+            "starting_capital": 1000.00,
+            "last_updated": None,
+            "trade_count": 0,
+            "all_time_high": 1000.00,
+            "all_time_low": 1000.00,
+        }
 
 
 def save_portfolio(portfolio: dict):

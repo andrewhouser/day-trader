@@ -201,10 +201,7 @@ def _run_task_in_thread(task_id: str, task_name: str, func):
 @app.get("/api/portfolio")
 def get_portfolio():
     """Return current portfolio state."""
-    try:
-        return load_portfolio()
-    except FileNotFoundError:
-        raise HTTPException(404, "portfolio.json not found")
+    return load_portfolio()
 
 
 @app.get("/api/portfolio/history")

@@ -25,6 +25,12 @@ echo "Ollama check complete"
 # Ensure data directories exist
 mkdir -p /app/trader/reports
 
+# Seed portfolio.json if it doesn't exist (fresh install)
+if [ ! -f /app/trader/portfolio.json ]; then
+    echo '{"cash_usd":1000.00,"positions":[],"total_value_usd":1000.00,"starting_capital":1000.00,"last_updated":null,"trade_count":0,"all_time_high":1000.00,"all_time_low":1000.00}' > /app/trader/portfolio.json
+    echo "Seeded default portfolio.json"
+fi
+
 # Run based on command
 case "${1:-api}" in
     api)
