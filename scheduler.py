@@ -184,7 +184,65 @@ def start_background_scheduler() -> BackgroundScheduler:
         job = _bg_scheduler.get_job(task_id)
         next_run = job.next_run_time.strftime("%Y-%m-%d %H:%M %Z") if job and job.next_run_time else "N/A"
         logger.info(f"  {name}: {getattr(config, cron_attr)} → next: {next_run}")
+
+    # Startup catch-up: if we're inside a job's active window and it hasn't
+    # run today, fire it immediately so agents don't wait for the next tick.
+    _run_startup_catchup(_bg_scheduler)
+
     return _bg_scheduler
+
+
+def _run_startup_catchup(scheduler: BackgroundScheduler):
+    """Check each job and schedule an immediate catch-up run if it was missed today."""
+    from datetime import timedelta
+    from zoneinfo import ZoneInfo
+
+    tz = ZoneInfo(config.TIMEZONE)
+    now = datetime.now(tz)
+    today = now.date()
+    history = _load_task_history()
+
+    # Build a set of task_ids that already ran today
+    ran_today: set[str] = set()
+    for entry in history:
+        try:
+            started = datetime.fromisoformat(entry["started_at"])
+            if started.date() == today:
+                ran_today.add(entry["task_id"])
+        except (KeyError, ValueError):
+            pass
+
+    catchup_count = 0
+    for task_id, name, func, cron_attr, grace in JOBS:
+        if task_id in ran_today:
+            continue
+
+        # Check if the job's cron had a fire time earlier today that we missed
+        cron_expr = getattr(config, cron_attr)
+        trigger = CronTrigger.from_crontab(cron_expr, timezone=config.TIMEZONE)
+
+        # Walk backward from now to find if there was a fire time today
+        # by checking what the previous fire time would have been
+        check_time = now - timedelta(seconds=1)
+        prev_fire = trigger.get_next_fire_time(None, now.replace(hour=0, minute=0, second=0))
+
+        if prev_fire and prev_fire.date() == today and prev_fire < now:
+            # There was a fire time today before now that we missed
+            delay = 5 + catchup_count * 10  # stagger to avoid overwhelming Ollama
+            scheduler.add_job(
+                _tracked(task_id, f"{name} (catch-up)", func),
+                "date",
+                run_date=now + timedelta(seconds=delay),
+                id=f"{task_id}_catchup",
+                name=f"{name} (catch-up)",
+                misfire_grace_time=3600,
+                max_instances=1,
+            )
+            logger.info(f"  ↳ Catch-up scheduled: {name} in {delay}s (missed {prev_fire.strftime('%H:%M')})")
+            catchup_count += 1
+
+    if catchup_count == 0:
+        logger.info("  No catch-up runs needed — all jobs are current")
 
 
 def get_scheduler() -> BackgroundScheduler | None:
