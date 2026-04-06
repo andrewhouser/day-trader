@@ -84,6 +84,7 @@ export interface TaskInfo {
   category: string;
   cron: string;
   is_running: boolean;
+  next_run: string | null;
   last_run: {
     task_id: string;
     task_name: string;

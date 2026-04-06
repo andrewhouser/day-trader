@@ -539,6 +539,18 @@ def get_tasks():
 
         cron = _get_task_cron(task_id)
 
+        # Get next scheduled run time from the live scheduler
+        next_run = None
+        try:
+            from scheduler import get_scheduler
+            sched = get_scheduler()
+            if sched:
+                job = sched.get_job(task_id)
+                if job and job.next_run_time:
+                    next_run = job.next_run_time.isoformat()
+        except Exception:
+            pass
+
         tasks.append({
             "task_id": task_id,
             "name": info["name"],
@@ -546,6 +558,7 @@ def get_tasks():
             "cron": cron,
             "is_running": is_running,
             "last_run": last_run,
+            "next_run": next_run,
         })
     return tasks
 

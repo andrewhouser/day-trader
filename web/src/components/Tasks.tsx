@@ -143,6 +143,9 @@ export function Tasks() {
             </div>
 
             <div className={styles.taskMeta}>
+              {task.next_run && (
+                <div>Next run: {new Date(task.next_run).toLocaleString()}</div>
+              )}
               Last run: {task.last_run ? new Date(task.last_run.started_at).toLocaleString() : "Never"}
               {task.last_run?.finished_at && (
                 <> · Finished: {new Date(task.last_run.finished_at).toLocaleString()}</>

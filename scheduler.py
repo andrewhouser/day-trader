@@ -172,6 +172,10 @@ def start_background_scheduler() -> BackgroundScheduler:
     _add_jobs(_bg_scheduler)
     _bg_scheduler.start()
 
+    # Ensure APScheduler executor logs are visible at INFO level
+    logging.getLogger("apscheduler.executors").setLevel(logging.INFO)
+    logging.getLogger("apscheduler.scheduler").setLevel(logging.INFO)
+
     logger.info("Background scheduler started")
     for task_id, name, _, cron_attr, _ in JOBS:
         logger.info(f"  {name}: {getattr(config, cron_attr)}")
