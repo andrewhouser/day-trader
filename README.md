@@ -15,7 +15,7 @@ The project is split into two services that run together via Docker Compose:
 │  trader (Python / FastAPI)                                       │
 │                                                                  │
 │  ┌────────────────────────────────────────────────────────────┐  │
-│  │  APScheduler (17 scheduled jobs)                           │  │
+│  │  APScheduler (18 scheduled jobs)                           │  │
 │  │                                                            │  │
 │  │  ── Overseas Monitors (follow-the-sun) ──────────────────  │  │
 │  │  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌─────────────┐  │  │
@@ -103,6 +103,7 @@ The system runs seventeen scheduled agents organized into four categories:
 | Events Calendar | 6:00 AM weekdays | `qwen2.5:7b` | Fetches upcoming economic events (FOMC, jobs, CPI, earnings) so the trader can avoid opening positions ahead of high-impact announcements. |
 | Market Context | 6:55 AM weekdays | `qwen3.5:latest` | Computes rolling 30-day portfolio arc, regime transitions, trade statistics, best/worst instruments, and correlation structure. |
 | Strategy Playbook | 6:30 AM Fridays | Research model | Reads all trade history and reflections, extracts recurring patterns with empirical win rates. High-confidence patterns get more weight; failing strategies get suspended. |
+| Speculation Analysis | 10 AM, 1 PM, 3 PM weekdays | Research model | Scans for asymmetric risk/reward setups the conservative trading agent might miss. Produces 1-3 speculative theses with targets, stops, reward/risk ratios, and invalidation points. |
 
 ### Risk, Portfolio & Maintenance
 
@@ -142,6 +143,7 @@ Market Regime ──→           │
 Position Sizing ──→         │
 Strategy Playbook ──→       │
 Market Context ──→          │
+Speculation Agent ──→       │
 Performance Feedback ──→    │
                             │
 Reflections ←───────────────┘
@@ -381,6 +383,7 @@ All persistent state lives in the `trader/` directory, which is volume-mounted f
 | `playbook.md` | Strategy playbook with empirical patterns and win rates |
 | `market_context.md` | Rolling 30-day market context summary |
 | `strategy_scores.json` | Per-strategy win/loss tracking and suspension status |
+| `speculation.md` | Speculative opportunity theses from the speculation agent |
 | `expansion_proposals.json` | Pending/approved/rejected expansion proposals |
 | `approved_instruments.json` | User-approved instruments beyond the core set |
 | `portfolio_history.json` | Daily portfolio value snapshots for charting |

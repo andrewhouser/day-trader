@@ -38,6 +38,7 @@ from playbook_agent import run_playbook_update
 from market_context import update_market_context
 from regime import detect_regime, load_regime
 from overseas_monitors import run_nikkei_open, run_nikkei_reopen, run_ftse_open, run_europe_handoff
+from speculation_agent import run_speculation
 
 logger = logging.getLogger(__name__)
 
@@ -488,6 +489,7 @@ TASK_REGISTRY = {
     "expansion": {"name": "Portfolio Expansion", "func": run_expansion_analysis, "category": "Risk & Portfolio"},
     "playbook": {"name": "Strategy Playbook", "func": run_playbook_update, "category": "Maintenance"},
     "market_context": {"name": "Market Context", "func": update_market_context, "category": "Intelligence"},
+    "speculation": {"name": "Speculation Analysis", "func": run_speculation, "category": "Intelligence"},
 }
 
 TASK_CRON_MAP = {
@@ -508,6 +510,7 @@ TASK_CRON_MAP = {
     "expansion": "EXPANSION_CRON",
     "playbook": "PLAYBOOK_CRON",
     "market_context": "MARKET_CONTEXT_CRON",
+    "speculation": "SPECULATION_CRON",
 }
 
 
@@ -895,6 +898,20 @@ def get_exchange_calendar_status():
     """Return current exchange session status, holidays, and DST info."""
     from exchange_calendar import get_current_session_info
     return get_current_session_info()
+
+
+@app.get("/api/speculation")
+def get_speculation(limit: int = 5):
+    """Return recent speculation analysis entries."""
+    raw = read_recent_entries(config.SPECULATION_PATH, limit)
+    sections = raw.split("\n---\n")
+    entries = []
+    for section in sections[1:]:
+        section = section.strip()
+        if section:
+            entries.append({"raw": section})
+    entries.reverse()
+    return entries
 
 
 @app.get("/api/config")

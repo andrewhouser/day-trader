@@ -59,6 +59,11 @@ OVERSEAS_TIMEOUT = int(os.getenv("OVERSEAS_TIMEOUT", "600"))
 PLAYBOOK_MODEL = os.getenv("PLAYBOOK_MODEL", "")   # Empty = use RESEARCH_MODEL
 PLAYBOOK_TIMEOUT = int(os.getenv("PLAYBOOK_TIMEOUT", "600"))
 
+# Speculation agent
+SPECULATION_MODEL = os.getenv("SPECULATION_MODEL", "")  # Empty = use RESEARCH_MODEL
+SPECULATION_TIMEOUT = int(os.getenv("SPECULATION_TIMEOUT", "600"))
+SPECULATION_CRON = os.getenv("SPECULATION_CRON", "0 10,13,15 * * 0-4")  # 10 AM, 1 PM, 3 PM weekdays
+
 # Adversarial bear-case debate: minimum position size (% of portfolio) to trigger
 BEAR_CASE_THRESHOLD_PCT = float(os.getenv("BEAR_CASE_THRESHOLD_PCT", "5.0"))
 # Confidence-gated temperature thresholds
@@ -90,6 +95,7 @@ TASK_HISTORY_PATH = os.path.join(DATA_DIR, "task_history.json")
 PLAYBOOK_PATH = os.path.join(DATA_DIR, "playbook.md")
 MARKET_CONTEXT_PATH = os.path.join(DATA_DIR, "market_context.md")
 STRATEGY_SCORES_PATH = os.path.join(DATA_DIR, "strategy_scores.json")
+SPECULATION_PATH = os.path.join(DATA_DIR, "speculation.md")
 
 # Overseas market monitor output files
 NIKKEI_MONITOR_PATH = os.path.join(DATA_DIR, "nikkei_monitor.md")

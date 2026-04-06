@@ -3,6 +3,7 @@
 ## 2026-04-06 (scheduler reliability)
 
 ### Added
+- **Speculation agent** (`speculation_agent.py`) — scans for asymmetric risk/reward setups the conservative trading agent might overlook. Runs 3x daily during market hours (10 AM, 1 PM, 3 PM ET). Produces 1-3 speculative theses with target %, stop %, reward/risk ratio (must be ≥1.5), confidence, timeframe, suggested position size (3-8%), and a concrete invalidation point. The trading agent reads these as a "Speculative Opportunities" section in its prompt and may use them as additional conviction — but still requires a passing composite score.
 - **Startup catch-up** — when the container starts mid-day, agents whose cron fire time has already passed today (but haven't run) are scheduled for immediate catch-up execution, staggered by 10s intervals to avoid overwhelming Ollama. Example: container starts at 7:30 AM → compaction, events, market context, morning report, and rebalancer all fire within the first minute.
 
 ### Fixed

@@ -27,6 +27,7 @@ const TASK_DESCRIPTIONS: Record<string, string> = {
   expansion: "Evaluates potential new instruments for portfolio diversification. Generates proposals that require your approval before the trading agent can trade them.",
   playbook: "Reads all trade history and reflections, extracts recurring strategy patterns with empirical win rates. Suspends strategies that consistently underperform.",
   market_context: "Computes a rolling 30-day view of portfolio arc, regime transitions, trade statistics, best/worst instruments, and correlation structure.",
+  speculation: "Scans for asymmetric risk/reward setups the conservative trading agent might overlook. Suggests 1-3 speculative opportunities with defined targets, stops, and invalidation points.",
 };
 
 export function Tasks() {

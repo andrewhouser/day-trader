@@ -61,6 +61,7 @@ trader/handoff_summary.md
 trader/playbook.md
 trader/market_context.md
 trader/strategy_scores.json
+trader/speculation.md
 trader/reports/*.md
 !trader/reports/.gitkeep
 trader/portfolio.json

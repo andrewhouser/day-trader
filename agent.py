@@ -726,6 +726,12 @@ def run_hourly_check():
 
     # Read sentiment and events context
     recent_sentiment = read_recent_entries(config.SENTIMENT_PATH, 3)
+    speculation_context = ""
+    try:
+        from speculation_agent import get_speculation_for_prompt
+        speculation_context = get_speculation_for_prompt(max_entries=2)
+    except Exception:
+        pass
     try:
         with open(config.EVENTS_PATH, "r") as f:
             events_calendar = f.read()[-2000:]
@@ -837,6 +843,9 @@ def run_hourly_check():
 ### Sentiment Analysis
 {recent_sentiment if recent_sentiment else "No sentiment data available yet."}
 
+### Speculative Opportunities (from Speculation Agent)
+{speculation_context if speculation_context else "No speculative opportunities identified yet."}
+
 ### Risk Alerts
 {recent_risk_alerts if recent_risk_alerts else "No recent risk alerts."}
 
@@ -876,6 +885,12 @@ INSTRUCTIONS:
 9. Review the HISTORICAL PERFORMANCE FEEDBACK. Learn from past patterns — if you tend to sell winners too early or hold losers too long, adjust.
 9.5. Consult the STRATEGY PLAYBOOK. If a current setup matches a documented pattern with a known win rate, use that as a prior. High-confidence patterns (≥65% win rate, 8+ trades) warrant a stronger signal. Low-sample patterns are hypotheses — treat them accordingly.
 9.6. Check SUSPENDED STRATEGIES. Any strategy flagged ⛔ has empirically failed — do not execute trades that primarily rely on that approach.
+9.7. **SPECULATIVE OPPORTUNITIES** — Review the Speculation Agent's output above. These are asymmetric risk/reward setups identified by a separate analyst. They are SUGGESTIONS, not orders.
+   - Each speculation includes a target %, stop %, reward/risk ratio, and invalidation point.
+   - Only act on speculations with reward/risk ≥ 1.5 and a clear invalidation you can monitor.
+   - Use the suggested position size (3-8% of portfolio) — these are smaller than normal trades.
+   - Speculative trades still require a passing composite score, but you may weight the speculation's catalyst as additional conviction in your momentum and risk/reward dimensions.
+   - If a speculation aligns with your own analysis, it strengthens the case. If it contradicts, explain why you disagree.
 10. Check STOP-LOSS & TAKE-PROFIT levels for existing positions. Trailing stops are managed automatically, but factor them into your analysis.
 10.5. **OVERSEAS TRADE SIGNALS** — If there are pending overseas signals above, evaluate each one:
    - Apply the standard scoring framework to the signal's ticker. The signal provides context (direction, move %, driver) but does NOT bypass your scoring thresholds.
