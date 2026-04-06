@@ -457,28 +457,28 @@ environment:
   - RESEARCH_TIMEOUT=600
   - EVENTS_TIMEOUT=600
   - PERFORMANCE_TIMEOUT=900
-  # Overseas monitors
-  - NIKKEI_OPEN_CRON=*/10 19-22 * * 0-4
-  - NIKKEI_REOPEN_CRON=*/15 23 * * 0-4
-  - NIKKEI_REOPEN_LATE_CRON=*/15 0-2 * * 1-5
-  - FTSE_OPEN_CRON=*/10 2-5 * * 1-5
-  - EUROPE_HANDOFF_CRON=30 5 * * 1-5
+  # Overseas monitors (APScheduler: 0=Mon..6=Sun)
+  - NIKKEI_OPEN_CRON=*/10 19-22 * * 6,0-3
+  - NIKKEI_REOPEN_CRON=*/15 23 * * 6,0-3
+  - NIKKEI_REOPEN_LATE_CRON=*/15 0-2 * * 0-4
+  - FTSE_OPEN_CRON=*/10 2-5 * * 0-4
+  - EUROPE_HANDOFF_CRON=30 5 * * 0-4
   # Core trading loop
-  - HOURLY_CRON=0,30 9-16 * * 1-5
-  - RESEARCH_CRON=5/10 9-16 * * 1-5
-  - MORNING_REPORT_CRON=0 7 * * 1-5
+  - HOURLY_CRON=0,30 9-16 * * 0-4
+  - RESEARCH_CRON=5/10 9-16 * * 0-4
+  - MORNING_REPORT_CRON=0 7 * * 0-4
   # Intelligence agents
-  - SENTIMENT_CRON=0 8,12,16 * * 1-5
-  - EVENTS_CRON=0 6 * * 1-5
-  - MARKET_CONTEXT_CRON=55 6 * * 1-5
-  - PLAYBOOK_CRON=30 6 * * 5
+  - SENTIMENT_CRON=0 8,12,16 * * 0-4
+  - EVENTS_CRON=0 6 * * 0-4
+  - MARKET_CONTEXT_CRON=55 6 * * 0-4
+  - PLAYBOOK_CRON=30 6 * * 4
   # Risk & portfolio
-  - RISK_MONITOR_CRON=*/3 9-16 * * 1-5
-  - REBALANCER_CRON=0 6 * * 1
+  - RISK_MONITOR_CRON=*/3 9-16 * * 0-4
+  - REBALANCER_CRON=0 6 * * 0
   # Analytics & maintenance
-  - PERFORMANCE_CRON=0 6 * * 5
-  - EXPANSION_CRON=0 7 * * 3
-  - COMPACTION_CRON=0 5 * * 1-5
+  - PERFORMANCE_CRON=0 6 * * 4
+  - EXPANSION_CRON=0 7 * * 2
+  - COMPACTION_CRON=0 5 * * 0-4
   # Risk thresholds
   - STOP_LOSS_PCT=3.0
   - OPPORTUNITY_PCT=2.0
