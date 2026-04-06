@@ -3,18 +3,28 @@
  * Handles the patterns used in this project's task schedules.
  */
 
+// APScheduler from_crontab uses ISO weekdays: 0=Mon, 1=Tue, ..., 6=Sun
 const DAY_NAMES: Record<string, string> = {
-  "0": "Sun", "1": "Mon", "2": "Tue", "3": "Wed", "4": "Thu", "5": "Fri", "6": "Sat", "7": "Sun",
+  "0": "Mon", "1": "Tue", "2": "Wed", "3": "Thu", "4": "Fri", "5": "Sat", "6": "Sun",
 };
 
 function describeDays(field: string): string {
   if (field === "*") return "";
-  // Range like 1-5
+  // Range like 0-4
   const range = field.match(/^(\d)-(\d)$/);
   if (range) {
     const from = DAY_NAMES[range[1]] ?? range[1];
     const to = DAY_NAMES[range[2]] ?? range[2];
     return `${from}–${to}`;
+  }
+  // Comma-separated (possibly with ranges), e.g. "6,0-3"
+  if (field.includes(",")) {
+    const parts = field.split(",").map((p) => {
+      const r = p.match(/^(\d)-(\d)$/);
+      if (r) return `${DAY_NAMES[r[1]] ?? r[1]}–${DAY_NAMES[r[2]] ?? r[2]}`;
+      return DAY_NAMES[p] ?? p;
+    });
+    return parts.join(", ");
   }
   // Single day
   if (DAY_NAMES[field]) return DAY_NAMES[field];

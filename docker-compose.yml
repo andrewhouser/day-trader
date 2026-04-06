@@ -16,27 +16,27 @@ services:
       - RESEARCH_TIMEOUT=600
       - EVENTS_TIMEOUT=600
       - PERFORMANCE_TIMEOUT=900
-      # Overseas monitor schedules (all times ET)
-      - NIKKEI_OPEN_CRON=${NIKKEI_OPEN_CRON:-*/10 19-22 * * 0-4}
-      - NIKKEI_REOPEN_CRON=${NIKKEI_REOPEN_CRON:-*/15 23 * * 0-4}
-      - NIKKEI_REOPEN_LATE_CRON=${NIKKEI_REOPEN_LATE_CRON:-*/15 0-2 * * 1-5}
-      - FTSE_OPEN_CRON=${FTSE_OPEN_CRON:-*/10 2-5 * * 1-5}
-      - EUROPE_HANDOFF_CRON=${EUROPE_HANDOFF_CRON:-30 5 * * 1-5}
+      # Overseas monitor schedules (all times ET, APScheduler: 0=Mon..6=Sun)
+      - NIKKEI_OPEN_CRON=${NIKKEI_OPEN_CRON:-*/10 19-22 * * 6,0-3}
+      - NIKKEI_REOPEN_CRON=${NIKKEI_REOPEN_CRON:-*/15 23 * * 6,0-3}
+      - NIKKEI_REOPEN_LATE_CRON=${NIKKEI_REOPEN_LATE_CRON:-*/15 0-2 * * 0-4}
+      - FTSE_OPEN_CRON=${FTSE_OPEN_CRON:-*/10 2-5 * * 0-4}
+      - EUROPE_HANDOFF_CRON=${EUROPE_HANDOFF_CRON:-30 5 * * 0-4}
       # Core trading loop
-      - HOURLY_CRON=0,30 9-16 * * 1-5
-      - MORNING_REPORT_CRON=0 7 * * 1-5
-      - RESEARCH_CRON=5/10 9-16 * * 1-5
+      - HOURLY_CRON=0,30 9-16 * * 0-4
+      - MORNING_REPORT_CRON=0 7 * * 0-4
+      - RESEARCH_CRON=5/10 9-16 * * 0-4
       - STOP_LOSS_PCT=3.0
       - OPPORTUNITY_PCT=2.0
-      - COMPACTION_CRON=0 5 * * 1-5
-      - SENTIMENT_CRON=0 8,12,16 * * 1-5
-      - RISK_MONITOR_CRON=*/3 9-16 * * 1-5
-      - REBALANCER_CRON=0 6 * * 1
-      - PERFORMANCE_CRON=0 6 * * 5
-      - EVENTS_CRON=0 6 * * 1-5
-      - EXPANSION_CRON=0 7 * * 3
-      - PLAYBOOK_CRON=30 6 * * 5
-      - MARKET_CONTEXT_CRON=55 6 * * 1-5
+      - COMPACTION_CRON=0 5 * * 0-4
+      - SENTIMENT_CRON=0 8,12,16 * * 0-4
+      - RISK_MONITOR_CRON=*/3 9-16 * * 0-4
+      - REBALANCER_CRON=0 6 * * 0
+      - PERFORMANCE_CRON=0 6 * * 4
+      - EVENTS_CRON=0 6 * * 0-4
+      - EXPANSION_CRON=0 7 * * 2
+      - PLAYBOOK_CRON=30 6 * * 4
+      - MARKET_CONTEXT_CRON=55 6 * * 0-4
       - BEAR_CASE_THRESHOLD_PCT=5.0
       - PLAYBOOK_HIGH_CONFIDENCE_WIN_RATE=0.65
       - PLAYBOOK_HIGH_CONFIDENCE_MIN_TRADES=8
