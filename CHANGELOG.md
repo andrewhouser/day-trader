@@ -1,5 +1,29 @@
 # Changelog
 
+## 2026-04-06
+
+### Added
+- **Page descriptions** — every page in the web dashboard now has a beginner-friendly intro blurb explaining what it shows and why it matters (via new `PageDescription` component)
+- **Learn page** (`/learn`) — comprehensive guide covering core investing concepts (portfolios, ETFs, bull/bear markets, risk management, technical analysis, diversification), the daily trading cycle as a step-by-step flow, all agent roles, and a glossary of 12 key terms (ATR, RSI, MACD, VIX, etc.)
+- **Agent role descriptions on Tasks page** — each task card now shows a one-line description of what the agent does
+- **Next run time on Tasks page** — each task card shows when the agent will fire next, pulled from the live APScheduler instance via new `next_run` field on `/api/tasks`
+
+### Changed
+- **Flattened project structure** — moved all files from `trader-app/` to the repository root; `docker compose` now runs from the root directory
+- **All model assignments overridable from `.env`** — `docker-compose.yml` model vars changed from hardcoded values to `${VAR:-default}` interpolation so `.env` overrides are respected
+- **Overseas monitor crons added to `docker-compose.yml`** — the 5 overseas schedules (Nikkei open/reopen/late, FTSE open, Europe handoff) were missing; now explicit and overridable from `.env`
+- **Comprehensive README update** — architecture diagram (17 jobs), all agent tables, overseas signal queue docs, exchange calendar/DST, hypothesis tracking, bear-case debate, strategy tracking, updated API endpoints, project structure, and configuration sections
+
+### Fixed
+- **Ollama health check blocked API startup for 150s** — reduced from 30 retries × 5s to 5 retries × 2s; API starts regardless of Ollama availability, agent tasks fail gracefully on LLM calls
+- **Missing `portfolio.json` caused 404/500 on Dashboard and Risk pages** — `load_portfolio()` now returns a default $1,000 portfolio instead of raising `FileNotFoundError`; entrypoint seeds the file on first run
+- **Performance page crash on null `profit_factor`** — frontend called `.toFixed(2)` on `null` after the backend changed from `Infinity` to `None`; now displays ∞ for both
+- **EVENTS_MODEL too slow** — reverted from `qwen3.5:latest` to `qwen2.5:7b` in `docker-compose.yml`; events calendar is a structured generation task that doesn't need deep reasoning
+- **`overseas_signals.py` missing from Dockerfile** — container crashed with `ModuleNotFoundError` on startup
+- **APScheduler executor logs suppressed** — uvicorn set third-party loggers to WARNING, hiding all job execution output; explicitly set APScheduler loggers to INFO so scheduled runs are visible in container logs
+- **Cron time display showed "6 AM:55" instead of "6:55 AM"** — `cronToHuman()` placed minutes after the AM/PM suffix; added `fmtTime()` helper that formats correctly
+- **`.gitignore` paths outdated after flatten** — updated from `trader-app/trader/` to `trader/`; added missing runtime data files (nikkei/ftse monitors, handoff, playbook, market context, strategy scores)
+
 ## 2026-04-04 (overseas trade signals)
 
 ### Added
