@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-04-06 (scheduler reliability)
+
+### Fixed
+- **Agents not firing on schedule** — `misfire_grace_time` was 5–10 minutes, causing APScheduler to silently skip every job whose fire time had already passed when the container started (e.g., container starts at 6:37 AM, 5 AM compaction is 97 minutes late, well past the 10-minute grace). Increased to 2 hours for pre-market/weekly jobs, 1 hour for overseas monitors, 15–30 minutes for market-hours jobs. Added `coalesce=True` (no duplicate runs on catch-up) and `max_instances=1` (no overlapping runs).
+- **Health endpoint now reports scheduler diagnostics** — thread state, job count, and next 3 fire times for debugging schedule issues
+
 ## 2026-04-06
 
 ### Added
