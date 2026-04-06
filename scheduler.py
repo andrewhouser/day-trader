@@ -124,26 +124,26 @@ def _tracked(task_id: str, task_name: str, func):
 
 JOBS = [
     # ── Overseas monitors (follow-the-sun: Asia → Europe → U.S.) ──
-    ("nikkei_open", "Nikkei Open Monitor", run_nikkei_open, "NIKKEI_OPEN_CRON", 300),
-    ("nikkei_reopen", "Nikkei Reopen Monitor", run_nikkei_reopen, "NIKKEI_REOPEN_CRON", 300),
-    ("nikkei_reopen_late", "Nikkei Reopen Monitor (late)", run_nikkei_reopen, "NIKKEI_REOPEN_LATE_CRON", 300),
-    ("ftse_open", "FTSE Open Monitor", run_ftse_open, "FTSE_OPEN_CRON", 300),
-    ("europe_handoff", "Europe Handoff Summary", run_europe_handoff, "EUROPE_HANDOFF_CRON", 600),
+    ("nikkei_open", "Nikkei Open Monitor", run_nikkei_open, "NIKKEI_OPEN_CRON", 3600),
+    ("nikkei_reopen", "Nikkei Reopen Monitor", run_nikkei_reopen, "NIKKEI_REOPEN_CRON", 3600),
+    ("nikkei_reopen_late", "Nikkei Reopen Monitor (late)", run_nikkei_reopen, "NIKKEI_REOPEN_LATE_CRON", 3600),
+    ("ftse_open", "FTSE Open Monitor", run_ftse_open, "FTSE_OPEN_CRON", 3600),
+    ("europe_handoff", "Europe Handoff Summary", run_europe_handoff, "EUROPE_HANDOFF_CRON", 3600),
     # ── U.S. pre-market ──
-    ("compaction", "Memory Compaction", run_compaction, "COMPACTION_CRON", 600),
-    ("events", "Events Calendar", run_events_calendar, "EVENTS_CRON", 600),
-    ("morning_report", "Morning Report", run_morning_report, "MORNING_REPORT_CRON", 600),
+    ("compaction", "Memory Compaction", run_compaction, "COMPACTION_CRON", 7200),
+    ("events", "Events Calendar", run_events_calendar, "EVENTS_CRON", 7200),
+    ("morning_report", "Morning Report", run_morning_report, "MORNING_REPORT_CRON", 7200),
     # ── U.S. market hours ──
-    ("research", "Market Research", run_research, "RESEARCH_CRON", 300),
-    ("hourly_check", "Market Check", run_hourly_check, "HOURLY_CRON", 300),
-    ("sentiment", "Sentiment Analysis", run_sentiment, "SENTIMENT_CRON", 300),
-    ("risk_monitor", "Risk Monitor", run_risk_monitor, "RISK_MONITOR_CRON", 60),
+    ("research", "Market Research", run_research, "RESEARCH_CRON", 900),
+    ("hourly_check", "Market Check", run_hourly_check, "HOURLY_CRON", 1800),
+    ("sentiment", "Sentiment Analysis", run_sentiment, "SENTIMENT_CRON", 3600),
+    ("risk_monitor", "Risk Monitor", run_risk_monitor, "RISK_MONITOR_CRON", 300),
     # ── Weekly / periodic ──
-    ("rebalancer", "Portfolio Rebalancer", run_rebalancer, "REBALANCER_CRON", 600),
-    ("performance", "Performance Analysis", run_performance_analysis, "PERFORMANCE_CRON", 600),
-    ("expansion", "Portfolio Expansion", run_expansion_analysis, "EXPANSION_CRON", 600),
-    ("playbook", "Strategy Playbook", run_playbook_update, "PLAYBOOK_CRON", 900),
-    ("market_context", "Market Context", update_market_context, "MARKET_CONTEXT_CRON", 300),
+    ("rebalancer", "Portfolio Rebalancer", run_rebalancer, "REBALANCER_CRON", 7200),
+    ("performance", "Performance Analysis", run_performance_analysis, "PERFORMANCE_CRON", 7200),
+    ("expansion", "Portfolio Expansion", run_expansion_analysis, "EXPANSION_CRON", 7200),
+    ("playbook", "Strategy Playbook", run_playbook_update, "PLAYBOOK_CRON", 7200),
+    ("market_context", "Market Context", update_market_context, "MARKET_CONTEXT_CRON", 7200),
 ]
 
 
@@ -157,6 +157,8 @@ def _add_jobs(scheduler):
             id=task_id,
             name=name,
             misfire_grace_time=grace,
+            coalesce=True,
+            max_instances=1,
         )
 
 
@@ -176,9 +178,12 @@ def start_background_scheduler() -> BackgroundScheduler:
     logging.getLogger("apscheduler.executors").setLevel(logging.INFO)
     logging.getLogger("apscheduler.scheduler").setLevel(logging.INFO)
 
+    # Log next fire times for verification
     logger.info("Background scheduler started")
     for task_id, name, _, cron_attr, _ in JOBS:
-        logger.info(f"  {name}: {getattr(config, cron_attr)}")
+        job = _bg_scheduler.get_job(task_id)
+        next_run = job.next_run_time.strftime("%Y-%m-%d %H:%M %Z") if job and job.next_run_time else "N/A"
+        logger.info(f"  {name}: {getattr(config, cron_attr)} → next: {next_run}")
     return _bg_scheduler
 
 

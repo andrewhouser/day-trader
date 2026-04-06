@@ -733,7 +733,28 @@ def get_compaction_status():
 
 @app.get("/api/health")
 def health():
-    return {"status": "ok", "timestamp": datetime.now().isoformat()}
+    import threading
+    from scheduler import get_scheduler
+    sched = get_scheduler()
+    sched_info = None
+    if sched:
+        sched_threads = [t.name for t in threading.enumerate() if "APScheduler" in t.name or "ThreadPool" in t.name]
+        jobs = []
+        for j in sched.get_jobs():
+            jobs.append({"id": j.id, "next_run": j.next_run_time.isoformat() if j.next_run_time else None})
+        sched_info = {
+            "running": sched.running,
+            "job_count": len(jobs),
+            "threads": sched_threads,
+            "next_3_jobs": sorted(jobs, key=lambda x: x["next_run"] or "")[:3],
+        }
+    all_threads = [{"name": t.name, "daemon": t.daemon, "alive": t.is_alive()} for t in threading.enumerate()]
+    return {
+        "status": "ok",
+        "timestamp": datetime.now().isoformat(),
+        "scheduler": sched_info,
+        "threads": all_threads,
+    }
 
 
 # ── New Agent Data ─────────────────────────────────────────
