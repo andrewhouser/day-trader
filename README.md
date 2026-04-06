@@ -156,6 +156,12 @@ Expansion Agent     ──→ Instrument Proposals ──→ User Approval
 
 All schedules are configurable via environment variables using cron syntax.
 
+**Important:** APScheduler's `from_crontab()` uses ISO weekdays (0=Mon through 6=Sun), not standard cron (0=Sun). All day-of-week values in this project follow the APScheduler convention.
+
+### Startup Catch-Up
+
+When the container starts mid-day (e.g., after a rebuild or restart), the scheduler checks each job: if its cron had a fire time earlier today that was missed and it hasn't run today, it schedules an immediate catch-up run. Runs are staggered by 10-second intervals to avoid overwhelming Ollama with concurrent LLM requests. Jobs whose fire time hasn't arrived yet wait for their normal schedule.
+
 ### Overseas Trade Signal Queue
 
 When overseas monitors detect significant moves (≥1.5% by default) in international ETFs (EWJ, EWU, EWG), they emit structured trade signals to `overseas_signals.json`. Each signal includes:

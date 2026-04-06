@@ -2,6 +2,9 @@
 
 ## 2026-04-06 (scheduler reliability)
 
+### Added
+- **Startup catch-up** — when the container starts mid-day, agents whose cron fire time has already passed today (but haven't run) are scheduled for immediate catch-up execution, staggered by 10s intervals to avoid overwhelming Ollama. Example: container starts at 7:30 AM → compaction, events, market context, morning report, and rebalancer all fire within the first minute.
+
 ### Fixed
 - **All cron day-of-week values were wrong** — APScheduler's `from_crontab()` uses ISO weekdays (0=Mon through 6=Sun), not standard cron (0=Sun through 6=Sat). Every schedule was shifted by one day: Mon–Fri jobs ran Tue–Sat, the Monday rebalancer ran Tuesday, Friday performance ran Saturday, and Sun–Thu overseas monitors ran Mon–Fri. All 17 crons corrected in `config.py`, `docker-compose.yml`, and the frontend day name display.
 - **Agents not firing on schedule** — `misfire_grace_time` was 5–10 minutes, causing APScheduler to silently skip every job whose fire time had already passed when the container started (e.g., container starts at 6:37 AM, 5 AM compaction is 97 minutes late, well past the 10-minute grace). Increased to 2 hours for pre-market/weekly jobs, 1 hour for overseas monitors, 15–30 minutes for market-hours jobs. Added `coalesce=True` (no duplicate runs on catch-up) and `max_instances=1` (no overlapping runs).
