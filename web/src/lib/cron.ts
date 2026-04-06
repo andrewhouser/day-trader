@@ -43,6 +43,14 @@ function fmtHour(h: number): string {
   return `${h - 12} PM`;
 }
 
+function fmtTime(h: number, m: number): string {
+  const minStr = m > 0 ? `:${m.toString().padStart(2, "0")}` : "";
+  if (h === 0) return `12${minStr} AM`;
+  if (h < 12) return `${h}${minStr} AM`;
+  if (h === 12) return `12${minStr} PM`;
+  return `${h - 12}${minStr} PM`;
+}
+
 export function cronToHuman(cron: string): string {
   const parts = cron.trim().split(/\s+/);
   if (parts.length !== 5) return cron;
@@ -82,14 +90,10 @@ export function cronToHuman(cron: string): string {
   // Specific time: 0 7 * * 1-5
   if (/^\d+$/.test(minute) && /^[\d,]+$/.test(hour)) {
     const min = parseInt(minute);
-    const minStr = min === 0 ? "" : `:${min.toString().padStart(2, "0")}`;
 
     // Multiple hours: 0 8,12,16 * * 1-5
     if (hour.includes(",")) {
-      const times = hour.split(",").map((h) => {
-        const hr = parseInt(h);
-        return `${fmtHour(hr)}${minStr}`;
-      });
+      const times = hour.split(",").map((h) => fmtTime(parseInt(h), min));
       const dayStr = days ? `, ${days}` : "";
       return times.join(", ") + dayStr;
     }
@@ -97,7 +101,7 @@ export function cronToHuman(cron: string): string {
     // Single hour
     const hr = parseInt(hour);
     const dayStr = days ? `, ${days}` : "";
-    return `${fmtHour(hr)}${minStr}${dayStr}`;
+    return `${fmtTime(hr, min)}${dayStr}`;
   }
 
   return cron;
