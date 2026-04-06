@@ -62,7 +62,7 @@ PLAYBOOK_TIMEOUT = int(os.getenv("PLAYBOOK_TIMEOUT", "600"))
 # Speculation agent
 SPECULATION_MODEL = os.getenv("SPECULATION_MODEL", "")  # Empty = use RESEARCH_MODEL
 SPECULATION_TIMEOUT = int(os.getenv("SPECULATION_TIMEOUT", "600"))
-SPECULATION_CRON = os.getenv("SPECULATION_CRON", "0 10,13,15 * * 0-4")  # 10 AM, 1 PM, 3 PM weekdays
+SPECULATION_CRON = os.getenv("SPECULATION_CRON", "0 10,11,13,14,15 * * 0-4")  # 10 AM, 11 AM, 1 PM, 2 PM, 3 PM weekdays
 
 # Adversarial bear-case debate: minimum position size (% of portfolio) to trigger
 BEAR_CASE_THRESHOLD_PCT = float(os.getenv("BEAR_CASE_THRESHOLD_PCT", "5.0"))
@@ -193,9 +193,9 @@ REGIME_PARAMS = {
         "strategy_note": "Sideways — reduce max position to 15%, favor mean reversion",
     },
     "DOWNTREND": {
-        "max_position_pct": 0.10,
+        "max_position_pct": 0.12,
         "stop_atr_multiplier": 1.5,
-        "regime_multiplier": 0.5,
+        "regime_multiplier": 0.7,
         "strategy_note": (
             "Downtrend — reduce max position to 10%, favor cash and defensives (XLU, XLP, TLT, SHY, GLD). "
             "REGIME BIAS IS A DEFAULT, NOT AN ABSOLUTE RULE: before dismissing any instrument, check whether "
@@ -230,6 +230,21 @@ REGIME_PARAMS = {
 # Scoring framework thresholds
 SCORE_BUY_THRESHOLD = int(os.getenv("SCORE_BUY_THRESHOLD", "3"))
 SCORE_SELL_THRESHOLD = int(os.getenv("SCORE_SELL_THRESHOLD", "-3"))
+
+# Dynamic buy threshold: when cash exceeds HIGH_CASH_PCT, use a lower buy threshold
+# to reduce cash drag and encourage cautious deployment
+SCORE_BUY_THRESHOLD_HIGH_CASH = int(os.getenv("SCORE_BUY_THRESHOLD_HIGH_CASH", "2"))
+HIGH_CASH_PCT = float(os.getenv("HIGH_CASH_PCT", "70.0"))  # % cash to trigger lower threshold
+
+# Speculative trade threshold: speculation-backed trades with reward/risk >= 2.0
+# can use a lower composite score threshold with a capped position size
+SCORE_BUY_THRESHOLD_SPECULATIVE = int(os.getenv("SCORE_BUY_THRESHOLD_SPECULATIVE", "2"))
+SPECULATION_MAX_POSITION_PCT = float(os.getenv("SPECULATION_MAX_POSITION_PCT", "0.05"))  # 5% cap
+
+# Momentum pulse: lightweight intraday momentum scanner
+MOMENTUM_PULSE_CRON = os.getenv("MOMENTUM_PULSE_CRON", "*/10 10-15 * * 0-4")  # Every 10 min, 10 AM–3 PM weekdays
+MOMENTUM_PULSE_PATH = os.path.join(DATA_DIR, "momentum_pulse.json")
+MOMENTUM_REVERSAL_RECOVERY_PCT = float(os.getenv("MOMENTUM_REVERSAL_RECOVERY_PCT", "60.0"))  # % recovery from session low to flag reversal
 
 # Compaction settings
 COMPACTION_CRON = os.getenv("COMPACTION_CRON", "0 5 * * 1-5")  # 5:00 AM weekdays (before morning report)

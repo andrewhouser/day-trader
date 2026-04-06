@@ -26,6 +26,7 @@ from overseas_monitors import run_nikkei_open, run_nikkei_reopen, run_ftse_open,
 from playbook_agent import run_playbook_update
 from market_context import update_market_context
 from speculation_agent import run_speculation
+from market_data import run_momentum_pulse
 
 logging.basicConfig(
     level=logging.INFO,
@@ -140,6 +141,7 @@ JOBS = [
     ("sentiment", "Sentiment Analysis", run_sentiment, "SENTIMENT_CRON", 3600),
     ("risk_monitor", "Risk Monitor", run_risk_monitor, "RISK_MONITOR_CRON", 300),
     ("speculation", "Speculation Analysis", run_speculation, "SPECULATION_CRON", 3600),
+    ("momentum_pulse", "Momentum Pulse", run_momentum_pulse, "MOMENTUM_PULSE_CRON", 300),
     # ── Weekly / periodic ──
     ("rebalancer", "Portfolio Rebalancer", run_rebalancer, "REBALANCER_CRON", 7200),
     ("performance", "Performance Analysis", run_performance_analysis, "PERFORMANCE_CRON", 7200),

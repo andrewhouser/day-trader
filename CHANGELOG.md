@@ -1,5 +1,24 @@
 # Changelog
 
+## 2026-04-06 (proactive trading tuning)
+
+### Added
+- **Dynamic buy threshold** — when portfolio cash exceeds 70% (configurable via `HIGH_CASH_PCT`), the composite score buy threshold drops from 3 to 2 (configurable via `SCORE_BUY_THRESHOLD_HIGH_CASH`). The LLM prompt explicitly communicates the reduced threshold and encourages proactive capital deployment rather than waiting for perfect setups.
+- **Intraday reversal detection** (`detect_intraday_reversal()`, `detect_intraday_reversals_all()`, `get_intraday_reversal_summary()` in `market_data.py`) — uses 5-minute intraday bars to detect when instruments recover ≥60% of their session range from the low. Reversal data is injected into the hourly trading prompt as a new "Intraday Reversal Scan" section with dedicated evaluation instructions (9.8).
+- **Momentum pulse scanner** (`run_momentum_pulse()` in `market_data.py`) — lightweight data-only job (no LLM call) that runs every 10 minutes during market hours (10 AM–3 PM). Scans all instruments for intraday reversal signals and writes them to `momentum_pulse.json`. The hourly check reads this file and includes active signals in the prompt as "Momentum Pulse Signals."
+- **Speculative trade threshold** — speculation-backed trades with reward/risk ≥ 2.0 can now use a reduced buy threshold of 2 (configurable via `SCORE_BUY_THRESHOLD_SPECULATIVE`) with a max position of 5% (configurable via `SPECULATION_MAX_POSITION_PCT`). The LLM must note "SPECULATIVE THRESHOLD APPLIED" in its reasoning when using this path.
+- **Cash drag warning** (instruction 9.9 in trading prompt) — when cash exceeds the high-cash threshold, the prompt explicitly pressures the agent to look for the best available opportunity and reminds it that the cost of missing a reversal is real.
+- **New config entries**: `SCORE_BUY_THRESHOLD_HIGH_CASH`, `HIGH_CASH_PCT`, `SCORE_BUY_THRESHOLD_SPECULATIVE`, `SPECULATION_MAX_POSITION_PCT`, `MOMENTUM_PULSE_CRON`, `MOMENTUM_PULSE_PATH`, `MOMENTUM_REVERSAL_RECOVERY_PCT`
+- **New scheduled job**: `momentum_pulse` (Momentum Pulse, every 10 min during market hours)
+- **New data file**: `trader/momentum_pulse.json` — latest momentum pulse scan results
+
+### Changed
+- **DOWNTREND regime multiplier** raised from 0.5 to 0.7 — gives the agent more risk budget to act during downtrends instead of being effectively paralyzed by tiny position sizes on a small portfolio.
+- **DOWNTREND max position** raised from 10% to 12% — slightly more room to take meaningful positions during downtrends while still being conservative.
+- **Speculation agent frequency** increased from 3x daily (10 AM, 1 PM, 3 PM) to 5x daily (10 AM, 11 AM, 1 PM, 2 PM, 3 PM) — closes the midday gap where intraday reversals were going unnoticed.
+- Hourly trading prompt now includes three new sections: Intraday Reversal Scan, Momentum Pulse Signals, and Cash Efficiency warning.
+- Scoring rules in the trading prompt now use the dynamic `effective_buy_threshold` instead of the static `SCORE_BUY_THRESHOLD`, with explicit messaging when the threshold is reduced.
+
 ## 2026-04-06 (scheduler reliability)
 
 ### Added

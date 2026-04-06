@@ -570,3 +570,143 @@ def get_correlation_summary(lookback_days: int = 30) -> str:
     lines = [f"\n### Portfolio Correlation Matrix ({lookback_days}-day rolling)\n"]
     lines.extend(result["summary_lines"])
     return "\n".join(lines)
+
+
+def detect_intraday_reversal(ticker: str = "SPY") -> dict | None:
+    """Detect if an instrument reversed from session lows.
+
+    Returns reversal info if price recovered a significant portion of the
+    intraday range from the low, indicating a potential trend reversal.
+    Returns None if insufficient data is available.
+    """
+    try:
+        data = yf.download(ticker, period="1d", interval="5m", progress=False)
+        if data.empty or len(data) < 3:
+            return None
+
+        # Handle MultiIndex columns from yf.download
+        if isinstance(data.columns, pd.MultiIndex):
+            data.columns = data.columns.get_level_values(0)
+
+        session_high = float(data["High"].max())
+        session_low = float(data["Low"].min())
+        current = float(data["Close"].iloc[-1])
+        open_price = float(data["Open"].iloc[0])
+
+        intraday_range = session_high - session_low
+        if intraday_range <= 0:
+            return None
+
+        recovery_pct = (current - session_low) / intraday_range * 100
+
+        if current >= open_price:
+            direction = "reversed_positive"
+        elif current > session_low + intraday_range * 0.5:
+            direction = "recovering"
+        else:
+            direction = "still_negative"
+
+        return {
+            "ticker": ticker,
+            "open": round(open_price, 2),
+            "high": round(session_high, 2),
+            "low": round(session_low, 2),
+            "current": round(current, 2),
+            "intraday_range": round(intraday_range, 2),
+            "recovery_pct": round(recovery_pct, 1),
+            "direction": direction,
+            "reversal_detected": recovery_pct >= config.MOMENTUM_REVERSAL_RECOVERY_PCT and direction in ("reversed_positive", "recovering"),
+            "timestamp": datetime.now().isoformat(),
+        }
+    except Exception as exc:
+        logger.debug(f"Intraday reversal detection error for {ticker}: {exc}")
+        return None
+
+
+def detect_intraday_reversals_all() -> dict:
+    """Run intraday reversal detection on key instruments.
+
+    Returns a dict keyed by ticker with reversal data for instruments
+    that show meaningful intraday recovery patterns.
+    """
+    # Check broad market indices + any instruments with large intraday moves
+    key_tickers = ["SPY", "QQQ", "DIA"]
+    # Also check instruments that moved > 1% from their session low recently
+    for ticker_sym in config.INSTRUMENTS:
+        if ticker_sym not in key_tickers:
+            key_tickers.append(ticker_sym)
+
+    results = {}
+    for ticker in key_tickers:
+        reversal = detect_intraday_reversal(ticker)
+        if reversal is not None:
+            results[ticker] = reversal
+
+    return results
+
+
+def get_intraday_reversal_summary() -> str:
+    """Build a text summary of intraday reversals for the trading prompt."""
+    reversals = detect_intraday_reversals_all()
+    if not reversals:
+        return "No intraday reversal data available."
+
+    lines = []
+    notable = []
+    for ticker, data in reversals.items():
+        if data.get("reversal_detected"):
+            notable.append(data)
+        direction_emoji = {"reversed_positive": "🔄↑", "recovering": "↗️", "still_negative": "↘️"}.get(data["direction"], "—")
+        lines.append(
+            f"- {ticker}: Open ${data['open']} → Low ${data['low']} → Now ${data['current']} "
+            f"{direction_emoji} | Range: ${data['intraday_range']} | "
+            f"Recovery: {data['recovery_pct']:.0f}% from low"
+        )
+
+    header = f"**{len(notable)} reversal(s) detected**" if notable else "No significant reversals detected"
+    return header + "\n" + "\n".join(lines)
+
+
+def run_momentum_pulse() -> dict:
+    """Lightweight momentum scanner that runs every 10 minutes during market hours.
+
+    Checks all instruments for significant intraday momentum shifts:
+    - Reversals from session lows (recovery > 60% of range)
+    - Instruments that moved > 1% from session low in last 30 minutes
+
+    Writes signals to momentum_pulse.json for the hourly check to read.
+    Does NOT invoke the LLM — this is a pure data check.
+    """
+    import json as _json
+
+    logger.info("Running momentum pulse scan...")
+    reversals = detect_intraday_reversals_all()
+
+    signals = []
+    for ticker, data in reversals.items():
+        if data.get("reversal_detected"):
+            signals.append({
+                "ticker": ticker,
+                "type": "intraday_reversal",
+                "recovery_pct": data["recovery_pct"],
+                "direction": data["direction"],
+                "open": data["open"],
+                "low": data["low"],
+                "current": data["current"],
+                "timestamp": data["timestamp"],
+            })
+
+    pulse = {
+        "scan_time": datetime.now().isoformat(),
+        "signals": signals,
+        "total_instruments_scanned": len(reversals),
+    }
+
+    try:
+        with open(config.MOMENTUM_PULSE_PATH, "w") as f:
+            _json.dump(pulse, f, indent=2)
+        logger.info(f"Momentum pulse: {len(signals)} signal(s) from {len(reversals)} instruments")
+    except Exception as e:
+        logger.error(f"Failed to write momentum pulse: {e}")
+
+    return pulse

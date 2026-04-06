@@ -14,6 +14,7 @@ from market_data import (
     fetch_technical_indicators,
     get_vix_term_structure_summary,
     get_correlation_summary,
+    get_intraday_reversal_summary,
 )
 from regime import detect_regime, get_regime_summary, load_regime
 from position_sizing import get_sizing_summary
@@ -710,6 +711,27 @@ def run_hourly_check():
     correlation_summary = get_correlation_summary(lookback_days=30)
     logger.info("VIX term structure and correlation matrix computed")
 
+    # 1b. Intraday reversal detection
+    reversal_summary = get_intraday_reversal_summary()
+    logger.info("Intraday reversal scan complete")
+
+    # 1c. Read momentum pulse signals (written by lightweight scanner every 10 min)
+    momentum_pulse_context = ""
+    try:
+        with open(config.MOMENTUM_PULSE_PATH, "r") as f:
+            pulse_data = json.load(f)
+        pulse_signals = pulse_data.get("signals", [])
+        if pulse_signals:
+            pulse_lines = [f"**{len(pulse_signals)} momentum signal(s)** (last scan: {pulse_data.get('scan_time', 'N/A')})"]
+            for sig in pulse_signals:
+                pulse_lines.append(
+                    f"- {sig['ticker']}: {sig['type']} — {sig['direction']}, "
+                    f"recovery {sig['recovery_pct']:.0f}% from low ${sig['low']} → ${sig['current']}"
+                )
+            momentum_pulse_context = "\n".join(pulse_lines)
+    except (FileNotFoundError, json.JSONDecodeError, KeyError):
+        pass
+
     # 2. Detect market regime
     regime_data = detect_regime(technicals)
     regime_summary = get_regime_summary()
@@ -773,6 +795,15 @@ def run_hourly_check():
     adaptive_temp = get_adaptive_temperature()
     logger.info(f"Adaptive temperature: {adaptive_temp} (default: {config.TEMPERATURE})")
 
+    # 5b. Dynamic buy threshold based on cash level
+    cash_pct = (portfolio["cash_usd"] / portfolio["total_value_usd"]) * 100 if portfolio["total_value_usd"] > 0 else 100
+    effective_buy_threshold = (
+        config.SCORE_BUY_THRESHOLD_HIGH_CASH
+        if cash_pct >= config.HIGH_CASH_PCT
+        else config.SCORE_BUY_THRESHOLD
+    )
+    logger.info(f"Cash: {cash_pct:.0f}% — effective buy threshold: {effective_buy_threshold} (normal: {config.SCORE_BUY_THRESHOLD})")
+
     # 6. Build prompt
     all_instruments = list(config.INSTRUMENTS.keys())
     instrument_details = json.dumps(config.INSTRUMENTS, indent=2)
@@ -804,6 +835,12 @@ def run_hourly_check():
 
 ### VIX Term Structure
 {vix_summary}
+
+### Intraday Reversal Scan
+{reversal_summary}
+
+### Momentum Pulse Signals
+{momentum_pulse_context if momentum_pulse_context else "No momentum pulse signals — no significant intraday reversals detected by the scanner."}
 
 {correlation_summary}
 
@@ -891,6 +928,12 @@ INSTRUCTIONS:
    - Use the suggested position size (3-8% of portfolio) — these are smaller than normal trades.
    - Speculative trades still require a passing composite score, but you may weight the speculation's catalyst as additional conviction in your momentum and risk/reward dimensions.
    - If a speculation aligns with your own analysis, it strengthens the case. If it contradicts, explain why you disagree.
+9.8. **INTRADAY REVERSAL SIGNALS** — Check the Intraday Reversal Scan and Momentum Pulse Signals above.
+   - If an instrument shows a reversal (opened negative, recovered >60% of intraday range, now positive or recovering), this is a momentum signal worth evaluating.
+   - Reversals in broad indices (SPY, QQQ, DIA) suggest the market is finding a floor — this can support BUY decisions in instruments with strong individual technicals.
+   - A reversal alone is NOT sufficient for a trade — it must be combined with positive trend/momentum scores. But it IS a reason to look harder at instruments you might otherwise skip.
+   - Intraday reversals are most meaningful when they occur on above-average volume.
+9.9. **CASH EFFICIENCY** — Your portfolio is currently {cash_pct:.0f}% cash.{f' Cash exceeds {config.HIGH_CASH_PCT:.0f}%, so the buy threshold has been REDUCED to {effective_buy_threshold}. You should actively look for the best available opportunity rather than waiting for a perfect setup. A composite score of {effective_buy_threshold} with good risk/reward is better than sitting in cash during a recovering market. The cost of missing a reversal is real — deploy capital cautiously but proactively.' if cash_pct >= config.HIGH_CASH_PCT else ' Cash level is within normal range.'}
 10. Check STOP-LOSS & TAKE-PROFIT levels for existing positions. Trailing stops are managed automatically, but factor them into your analysis.
 10.5. **OVERSEAS TRADE SIGNALS** — If there are pending overseas signals above, evaluate each one:
    - Apply the standard scoring framework to the signal's ticker. The signal provides context (direction, move %, driver) but does NOT bypass your scoring thresholds.
@@ -923,9 +966,10 @@ INSTRUCTIONS:
     ```
 
     RULES:
-    - Only BUY when composite score > {config.SCORE_BUY_THRESHOLD}
+    - Only BUY when composite score > {effective_buy_threshold}{f' (REDUCED from {config.SCORE_BUY_THRESHOLD} because cash is {cash_pct:.0f}% — above {config.HIGH_CASH_PCT:.0f}% threshold)' if effective_buy_threshold < config.SCORE_BUY_THRESHOLD else ''}
     - Only SELL (beyond automatic stops) when composite score < {config.SCORE_SELL_THRESHOLD}
-    - Between {config.SCORE_SELL_THRESHOLD} and {config.SCORE_BUY_THRESHOLD}, default to HOLD
+    - Between {config.SCORE_SELL_THRESHOLD} and {effective_buy_threshold}, default to HOLD
+    - **SPECULATIVE THRESHOLD**: If a Speculation Agent opportunity aligns with your analysis AND has reward/risk ≥ 2.0, the buy threshold is reduced to {config.SCORE_BUY_THRESHOLD_SPECULATIVE} for that instrument with a max position of {config.SPECULATION_MAX_POSITION_PCT * 100:.0f}% of portfolio. You must explicitly note "SPECULATIVE THRESHOLD APPLIED" in your reasoning.
     - **REGIME BIAS OVERRIDE**: The regime's instrument-type preference (e.g., "favor defensives in downtrend") is a DEFAULT, not a veto. If an instrument scores +1 or +2 on sector divergence AND scores positively on trend and momentum on its own merits, it is eligible for a BUY regardless of its classification as "cyclical." You MUST document the divergence driver explicitly in your trade reasoning.
     - **SPIKE VS. TREND**: A single-session price spike (+5% in one day) without prior multi-session uptrend is NOT a divergence signal — it is noise. Do not buy spikes. Require at least 2-3 sessions of sustained price improvement to confirm divergence.
 
@@ -960,7 +1004,7 @@ Apply them by multiplying each raw score by its weight before summing the compos
 IMPORTANT: You must still output raw integer scores (-2 to +2) for each dimension in your JSON.
 The weighted composite is computed by the system — output raw scores only.
 
-Remember: Max position size is regime-adjusted to {regime_params.get('max_position_pct', 0.25) * 100:.0f}% currently. You have ${portfolio['cash_usd']:.2f} in cash and ${portfolio['total_value_usd']:.2f} total portfolio value."""
+Remember: Max position size is regime-adjusted to {regime_params.get('max_position_pct', 0.25) * 100:.0f}% currently. You have ${portfolio['cash_usd']:.2f} in cash ({cash_pct:.0f}% of portfolio) and ${portfolio['total_value_usd']:.2f} total portfolio value. Buy threshold: {effective_buy_threshold}."""
 
     # 7. Get LLM decision (with confidence-gated temperature)
     logger.info(f"Sending analysis to LLM (temp={adaptive_temp:.2f})...")

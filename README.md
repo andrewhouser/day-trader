@@ -15,7 +15,7 @@ The project is split into two services that run together via Docker Compose:
 │  trader (Python / FastAPI)                                       │
 │                                                                  │
 │  ┌────────────────────────────────────────────────────────────┐  │
-│  │  APScheduler (18 scheduled jobs)                           │  │
+│  │  APScheduler (19 scheduled jobs)                           │  │
 │  │                                                            │  │
 │  │  ── Overseas Monitors (follow-the-sun) ──────────────────  │  │
 │  │  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌─────────────┐  │  │
@@ -29,6 +29,11 @@ The project is split into two services that run together via Docker Compose:
 │  │  │ Research  │ │ Trader   │ │Sentiment │ │   Risk      │  │  │
 │  │  │ (10 min) │ │ (30 min) │ │  (3x/d)  │ │  (3 min)    │  │  │
 │  │  └──────────┘ └──────────┘ └──────────┘ └─────────────┘  │  │
+│  │  ┌──────────┐                                              │  │
+│  │  │ Momentum │                                              │  │
+│  │  │  Pulse   │                                              │  │
+│  │  │ (10 min) │                                              │  │
+│  │  └──────────┘                                              │  │
 │  │                                                            │  │
 │  │  ── Intelligence & Analytics ────────────────────────────  │  │
 │  │  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌─────────────┐  │  │
@@ -76,7 +81,7 @@ The project is split into two services that run together via Docker Compose:
 
 ## Agents
 
-The system runs seventeen scheduled agents organized into four categories:
+The system runs nineteen scheduled agents organized into four categories:
 
 ### Overseas Monitors (Follow-the-Sun)
 
@@ -92,7 +97,7 @@ The system runs seventeen scheduled agents organized into four categories:
 | Agent | Schedule | Model | Description |
 |-------|----------|-------|-------------|
 | Market Research | Every 10 min (9 AM–4 PM) | `qwen3.5:latest` | Gathers data from 7 sources (FRED, Finnhub, SEC EDGAR, Alpha Vantage, Finviz, Reuters, Investing.com), produces structured research notes, checks stop-loss/opportunity alerts. Triggers the trader if alerts fire. |
-| Market Check | Every 30 min (9 AM–4 PM) | `deepseek-r1:14b` | Full trading cycle — reads research, sentiment, risk alerts, events, technicals, regime, overseas signals, playbook, and scoring framework. Scores instruments, runs bear-case debate on large trades, executes trades, writes reflections. |
+| Market Check | Every 30 min (9 AM–4 PM) | `deepseek-r1:14b` | Full trading cycle — reads research, sentiment, risk alerts, events, technicals, regime, overseas signals, playbook, intraday reversals, momentum pulse, and scoring framework. Scores instruments with dynamic buy threshold (reduced when cash is high), runs bear-case debate on large trades, executes trades, writes reflections. |
 | Morning Report | 7:00 AM weekdays | `qwen2.5:7b` | Daily summary with portfolio state, overnight global recap (Asia + Europe), trades, performance, and outlook. |
 
 ### Intelligence Agents
@@ -103,7 +108,8 @@ The system runs seventeen scheduled agents organized into four categories:
 | Events Calendar | 6:00 AM weekdays | `qwen2.5:7b` | Fetches upcoming economic events (FOMC, jobs, CPI, earnings) so the trader can avoid opening positions ahead of high-impact announcements. |
 | Market Context | 6:55 AM weekdays | `qwen3.5:latest` | Computes rolling 30-day portfolio arc, regime transitions, trade statistics, best/worst instruments, and correlation structure. |
 | Strategy Playbook | 6:30 AM Fridays | Research model | Reads all trade history and reflections, extracts recurring patterns with empirical win rates. High-confidence patterns get more weight; failing strategies get suspended. |
-| Speculation Analysis | 10 AM, 1 PM, 3 PM weekdays | Research model | Scans for asymmetric risk/reward setups the conservative trading agent might miss. Produces 1-3 speculative theses with targets, stops, reward/risk ratios, and invalidation points. |
+| Speculation Analysis | 10 AM, 11 AM, 1 PM, 2 PM, 3 PM weekdays | Research model | Scans for asymmetric risk/reward setups the conservative trading agent might miss. Produces 1-3 speculative theses with targets, stops, reward/risk ratios, and invalidation points. Runs 5x daily to catch midday reversals. |
+| Momentum Pulse | Every 10 min (10 AM–3 PM) | None (data-only) | Lightweight intraday scanner — no LLM call. Detects instruments recovering ≥60% of session range from lows. Writes signals to `momentum_pulse.json` for the hourly check to consume. |
 
 ### Risk, Portfolio & Maintenance
 
@@ -144,6 +150,8 @@ Position Sizing ──→         │
 Strategy Playbook ──→       │
 Market Context ──→          │
 Speculation Agent ──→       │
+Momentum Pulse ──→          │
+Intraday Reversals ──→      │
 Performance Feedback ──→    │
                             │
 Reflections ←───────────────┘
@@ -230,7 +238,7 @@ The system classifies the current market into one of six regimes, stored in `reg
 | STRONG_UPTREND | SPY above SMA 50 & 200, golden cross, ROC > 3% | Full position sizes (25%), favor cyclicals (XLK, XLF, XLE) |
 | UPTREND | SPY above SMA 50 & 200, positive ROC | Full position sizes, favor buying dips |
 | SIDEWAYS | Mixed signals | Reduce max position to 15%, favor mean reversion |
-| DOWNTREND | SPY below SMA 50 & 200, negative ROC | Reduce max position to 10%, favor cash and defensives (XLU, XLP, TLT, SHY, GLD) |
+| DOWNTREND | SPY below SMA 50 & 200, negative ROC | Reduce max position to 12%, favor cash and defensives (XLU, XLP, TLT, SHY, GLD), regime multiplier 0.7× |
 | STRONG_DOWNTREND | SPY below SMA 50 & 200, death cross, ROC < -3% | Reduce max position to 10%, tighten stops |
 | HIGH_VOLATILITY | VIX > 30 | Reduce max position to 10%, widen stops to 2.5x ATR, favor safe havens |
 
@@ -260,7 +268,7 @@ Regime detection uses: SPY price vs SMA 50/200, golden/death cross, RSI, VIX lev
 ### Volatility-Scaled Position Sizing
 - Position size = `(risk_budget / ATR)` where risk budget = 2% of portfolio value per trade
 - Volatile instruments automatically get smaller positions, stable instruments get larger ones
-- A regime multiplier scales the risk budget (1.0× in uptrends, 0.5× in downtrends)
+- A regime multiplier scales the risk budget (1.0× in uptrends, 0.7× in downtrends, 0.5× in strong downtrends/high volatility)
 - Capped at the regime-adjusted max position percentage
 
 ### Structured Scoring Framework
@@ -275,11 +283,12 @@ Before any trade, the LLM must score each instrument on six dimensions (-2 to +2
 | Event Risk | Penalty (-2 to 0) for upcoming high-impact events |
 | Sector Divergence | Whether the instrument is moving independently of the broad market (-1 to +2) |
 
-- **BUY** only when composite score > +3
+- **BUY** only when composite score > +3 (or > +2 when cash exceeds 70% of portfolio)
 - **SELL** (beyond automatic stops) only when composite score < -3
-- **HOLD** when score is between -3 and +3
+- **HOLD** when score is between -3 and the active buy threshold
+- **Speculative BUY** when a Speculation Agent opportunity aligns with analysis, has reward/risk ≥ 2.0, and composite score > +2 (max 5% position)
 
-Thresholds are configurable via `SCORE_BUY_THRESHOLD` and `SCORE_SELL_THRESHOLD`. Adaptive per-instrument weights are learned from trade outcomes and applied to the composite calculation.
+Thresholds are configurable via `SCORE_BUY_THRESHOLD`, `SCORE_SELL_THRESHOLD`, `SCORE_BUY_THRESHOLD_HIGH_CASH`, and `SCORE_BUY_THRESHOLD_SPECULATIVE`. The dynamic buy threshold activates automatically when cash exceeds `HIGH_CASH_PCT` (default 70%). Adaptive per-instrument weights are learned from trade outcomes and applied to the composite calculation.
 
 ### Hypothesis Tracking
 All BUY trades require structured hypothesis fields:
@@ -384,6 +393,7 @@ All persistent state lives in the `trader/` directory, which is volume-mounted f
 | `market_context.md` | Rolling 30-day market context summary |
 | `strategy_scores.json` | Per-strategy win/loss tracking and suspension status |
 | `speculation.md` | Speculative opportunity theses from the speculation agent |
+| `momentum_pulse.json` | Latest intraday momentum pulse scan results (reversal signals) |
 | `expansion_proposals.json` | Pending/approved/rejected expansion proposals |
 | `approved_instruments.json` | User-approved instruments beyond the core set |
 | `portfolio_history.json` | Daily portfolio value snapshots for charting |
@@ -497,6 +507,12 @@ environment:
   # Scoring thresholds
   - SCORE_BUY_THRESHOLD=3
   - SCORE_SELL_THRESHOLD=-3
+  # Dynamic thresholds (proactive trading)
+  - SCORE_BUY_THRESHOLD_HIGH_CASH=2
+  - HIGH_CASH_PCT=70.0
+  - SCORE_BUY_THRESHOLD_SPECULATIVE=2
+  - SPECULATION_MAX_POSITION_PCT=0.05
+  - MOMENTUM_REVERSAL_RECOVERY_PCT=60.0
   - TZ=America/New_York
 ```
 

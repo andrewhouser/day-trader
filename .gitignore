@@ -63,6 +63,7 @@ trader/market_context.md
 trader/strategy_scores.json
 trader/overseas_signals.json
 trader/speculation.md
+trader/momentum_pulse.json
 trader/reports/*.md
 !trader/reports/.gitkeep
 trader/portfolio.json
