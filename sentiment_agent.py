@@ -29,6 +29,14 @@ FINNHUB_KEY = os.getenv("FINNHUB_API_KEY", "")
 FINNHUB_BASE = "https://finnhub.io/api/v1"
 FINVIZ_RSS = "https://finviz.com/news_export.ashx?v=3"
 
+# RSS feeds that work without API keys from Docker containers
+_RSS_FEEDS = {
+    "Google Finance (Market)": "https://news.google.com/rss/search?q=stock+market+today&hl=en-US&gl=US&ceid=US:en",
+    "Google Finance (Economy)": "https://news.google.com/rss/search?q=economy+federal+reserve&hl=en-US&gl=US&ceid=US:en",
+    "CNBC Markets": "https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=20910258",
+    "CNBC Economy": "https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=20910266",
+}
+
 
 def _fetch_finnhub_news() -> dict[str, list[str]]:
     """Fetch news from Finnhub: general market news + company news for key instruments."""
@@ -158,11 +166,74 @@ def _fetch_yfinance_news() -> dict[str, list[str]]:
     return all_news
 
 
+def _fetch_rss_news() -> dict[str, list[str]]:
+    """Fetch news from public RSS feeds (Google News, CNBC). No API key needed.
+
+    These feeds are the most reliable from inside Docker containers since they
+    don't require authentication or special headers.
+    """
+    import xml.etree.ElementTree as ET
+
+    all_news: dict[str, list[str]] = {}
+    session = requests.Session()
+    session.headers["User-Agent"] = (
+        "Mozilla/5.0 (compatible; TraderAgent/1.0; +https://github.com/trader)"
+    )
+
+    for feed_name, url in _RSS_FEEDS.items():
+        try:
+            resp = session.get(url, timeout=15)
+            if not resp.ok:
+                logger.warning(f"[sentiment/rss] {feed_name}: HTTP {resp.status_code}")
+                continue
+
+            root = ET.fromstring(resp.text)
+            headlines = []
+            for item in root.findall(".//item"):
+                title = item.findtext("title", "").strip()
+                if title:
+                    # Google News wraps titles with source: "Headline - Source"
+                    # Keep it as-is — the source attribution is useful context
+                    headlines.append(title)
+
+            if headlines:
+                all_news[feed_name] = headlines[:15]
+                logger.info(f"[sentiment/rss] {feed_name}: {len(headlines[:15])} headlines")
+        except ET.ParseError as e:
+            logger.warning(f"[sentiment/rss] {feed_name}: XML parse error: {e}")
+        except Exception as e:
+            logger.warning(f"[sentiment/rss] {feed_name}: fetch error: {e}")
+
+    # Also fetch instrument-specific news from Google News
+    instrument_set = set(config.INSTRUMENTS.keys())
+    key_tickers = ["SPY", "QQQ", "DIA", "XLE", "GLD", "TLT"]
+    for ticker in key_tickers:
+        try:
+            label = config.INSTRUMENTS.get(ticker, {}).get("tracks", ticker)
+            search_url = f"https://news.google.com/rss/search?q={ticker}+stock&hl=en-US&gl=US&ceid=US:en"
+            resp = session.get(search_url, timeout=10)
+            if not resp.ok:
+                continue
+            root = ET.fromstring(resp.text)
+            headlines = []
+            for item in root.findall(".//item")[:5]:
+                title = item.findtext("title", "").strip()
+                if title:
+                    headlines.append(title)
+            if headlines:
+                key = f"{ticker} ({label})"
+                all_news[key] = headlines
+        except Exception:
+            pass  # Best-effort per-ticker search
+
+    return all_news
+
+
 def _fetch_news() -> dict[str, list[str]]:
     """Fetch news from all available sources with priority fallback.
 
     Returns a merged dict of {label: [headlines]} from whichever sources
-    produce data. Finnhub is tried first, then Finviz, then yfinance.
+    produce data. Tries all sources and merges results.
     """
     all_news: dict[str, list[str]] = {}
     sources_used: list[str] = []
@@ -173,21 +244,30 @@ def _fetch_news() -> dict[str, list[str]]:
         all_news.update(finnhub)
         sources_used.append("finnhub")
 
-    # 2. Finviz RSS (no key, good general market headlines)
-    finviz = _fetch_finviz_news()
-    if finviz:
-        # Merge without overwriting — Finviz may have headlines for instruments
-        # Finnhub didn't cover, or general market news
-        for key, headlines in finviz.items():
+    # 2. Public RSS feeds (Google News, CNBC — no key, works from Docker)
+    rss = _fetch_rss_news()
+    if rss:
+        for key, headlines in rss.items():
             if key in all_news:
-                # Deduplicate by adding only headlines not already present
                 existing = set(all_news[key])
                 all_news[key].extend(h for h in headlines if h not in existing)
             else:
                 all_news[key] = headlines
-        sources_used.append("finviz")
+        sources_used.append("rss")
 
-    # 3. yfinance fallback (only if we got very little from above)
+    # 3. Finviz RSS (no key, but often 403s from Docker)
+    if len(all_news) < 5:
+        finviz = _fetch_finviz_news()
+        if finviz:
+            for key, headlines in finviz.items():
+                if key in all_news:
+                    existing = set(all_news[key])
+                    all_news[key].extend(h for h in headlines if h not in existing)
+                else:
+                    all_news[key] = headlines
+            sources_used.append("finviz")
+
+    # 4. yfinance fallback (only if we got very little from above)
     if len(all_news) < 3:
         yf_news = _fetch_yfinance_news()
         if yf_news:
