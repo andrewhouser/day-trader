@@ -41,6 +41,7 @@ const TAB_GROUPS: TabGroup[] = [
     tabs: [
       { href: "/events", label: "Events" },
       { href: "/news", label: "News" },
+      { href: "/overseas", label: "Overseas" },
       { href: "/performance", label: "Performance" },
       { href: "/risk", label: "Risk" },
       { href: "/sentiment", label: "Sentiment" },

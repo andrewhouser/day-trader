@@ -193,6 +193,25 @@ export interface NewsResult {
   timestamp: string;
 }
 
+export interface OverseasSignal {
+  id: string;
+  ticker: string;
+  direction: string;
+  move_pct: number;
+  driver: string;
+  urgency: string;
+  suggested_action?: string;
+  status: string;
+  created_at: string;
+  evaluated_at?: string;
+}
+
+export interface OverseasSignalsResult {
+  pending: OverseasSignal[];
+  evaluated: OverseasSignal[];
+  total: number;
+}
+
 export const api = {
   getPortfolio: () => fetchJson<Portfolio>("/portfolio"),
   getPortfolioHistory: (days = 30) =>
@@ -246,4 +265,13 @@ export const api = {
     fetchJson<Record<string, { type: string; tracks: string }>>("/expansion/instruments"),
   chat: (message: string) =>
     postJsonWithBody<{ response: string }>("/chat", { message }),
+  // Overseas monitors
+  getNikkeiMonitor: (limit = 5) =>
+    fetchJson<{ raw: string }[]>(`/overseas/nikkei?limit=${limit}`),
+  getFtseMonitor: (limit = 5) =>
+    fetchJson<{ raw: string }[]>(`/overseas/ftse?limit=${limit}`),
+  getHandoffSummary: (limit = 3) =>
+    fetchJson<{ raw: string }[]>(`/overseas/handoff?limit=${limit}`),
+  getOverseasSignals: () =>
+    fetchJson<OverseasSignalsResult>("/overseas/signals"),
 };
