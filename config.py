@@ -12,6 +12,7 @@ EXPANSION_MODEL = os.getenv("EXPANSION_MODEL", "qwen3.5:latest")  # Expansion an
 COMPACTION_MODEL = os.getenv("COMPACTION_MODEL", "phi3:3.8b")  # Compaction (lightweight summarization)
 TEMPERATURE = float(os.getenv("TEMPERATURE", "0.3"))
 OLLAMA_TIMEOUT = int(os.getenv("OLLAMA_TIMEOUT", "300"))  # Default timeout for Ollama requests (seconds)
+HOURLY_CHECK_TIMEOUT = int(os.getenv("HOURLY_CHECK_TIMEOUT", "600"))  # Extended timeout for hourly market check (seconds)
 EVENTS_TIMEOUT = int(os.getenv("EVENTS_TIMEOUT", "600"))  # Extended timeout for events calendar (seconds)
 RESEARCH_TIMEOUT = int(os.getenv("RESEARCH_TIMEOUT", "600"))  # Extended timeout for research agent (seconds)
 PERFORMANCE_TIMEOUT = int(os.getenv("PERFORMANCE_TIMEOUT", "900"))  # Extended timeout for performance analyst (seconds)
