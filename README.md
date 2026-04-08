@@ -168,6 +168,8 @@ All schedules are configurable via environment variables using cron syntax.
 
 **Important:** APScheduler's `from_crontab()` uses ISO weekdays (0=Mon through 6=Sun), not standard cron (0=Sun). All day-of-week values in this project follow the APScheduler convention.
 
+**LLM request serialization:** All `call_ollama()` invocations are serialized through a global threading lock so only one LLM request is in-flight at a time. This prevents concurrent agents from saturating the GPU when their schedules overlap (e.g., Research + Market Check both firing at :30). The APScheduler thread pool is limited to 4 workers. Non-LLM jobs (Risk Monitor, Momentum Pulse) are unaffected.
+
 ### Startup Catch-Up
 
 When the container starts mid-day (e.g., after a rebuild or restart), the scheduler checks each job: if its cron had a fire time earlier today that was missed and it hasn't run today, it schedules an immediate catch-up run. Runs are staggered by 10-second intervals to avoid overwhelming Ollama with concurrent LLM requests. Jobs whose fire time hasn't arrived yet wait for their normal schedule.

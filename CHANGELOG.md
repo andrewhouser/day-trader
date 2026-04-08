@@ -12,6 +12,7 @@
 - **1-share override and graduated absolute ceiling** — no longer needed now that fractional shares allow precise dollar-based sizing at any portfolio size.
 
 ### Fixed
+- **GPU saturation from concurrent agents** — during market hours, Research (every 10 min), Market Check (every 30 min), Speculation (5x daily), and Sentiment (3x daily) all fired via APScheduler's default 20-thread pool. When crons overlapped, multiple threads hit Ollama simultaneously, keeping the GPU pegged at 100% with no idle window for the model to unload. Added a `threading.Lock` around `call_ollama()` so only one LLM request is in-flight at a time. Reduced the APScheduler thread pool from 20 to 4 workers.
 - **Morning report timing out** — `run_morning_report()` called `call_ollama()` without an explicit timeout, falling back to the 300s default which was too short. Now uses `REPORT_TIMEOUT` (600s).
 - **Market Check reflection calls missing explicit timeouts** — the closed-trade reflection and cycle reflection `call_ollama()` calls inside `run_hourly_check()` used the default 300s timeout. Now pass `config.OLLAMA_TIMEOUT` explicitly.
 - **`max_pct` NameError in hourly check prompt** — the prompt string in `run_hourly_check()` referenced `max_pct`, a variable only defined in the separate `validate_trade()` function. Replaced with inline `regime_params.get('max_position_pct', config.MAX_POSITION_PCT)`.
