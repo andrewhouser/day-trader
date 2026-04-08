@@ -8,6 +8,7 @@
 - **Market Check cycle budget** — the hourly check now tracks wall-clock elapsed time (`HOURLY_CHECK_TIMEOUT + 120s`). Before each non-essential LLM call (bear-case debate, closed-trade reflections, cycle reflection), it checks remaining budget and skips if time is running low. Prevents the cycle from blocking the next scheduled run. Elapsed time is logged at the end of each cycle.
 - **`REPORT_TIMEOUT`** (default 600s) — dedicated timeout for the morning report LLM call, added to `config.py` and `docker-compose.yml`. Previously fell back to the 300s default `OLLAMA_TIMEOUT`.
 - **Portfolio History range persisted in localStorage** — the selected time range (1D, 7D, 1M, etc.) on the Portfolio History chart is now saved to `localStorage` and restored on page load, so users don't have to reselect their preferred view each visit.
+- **Per-position lines on Portfolio History chart** — portfolio snapshots now record each position's market value (ticker → quantity × price). The chart renders each position as a dashed line with a distinct color alongside the existing Portfolio Value and Cash areas. Older snapshots without position data render cleanly — lines start from when positions were first recorded.
 
 ### Removed
 - **1-share override and graduated absolute ceiling** — no longer needed now that fractional shares allow precise dollar-based sizing at any portfolio size.

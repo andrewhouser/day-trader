@@ -406,7 +406,7 @@ All persistent state lives in the `trader/` directory, which is volume-mounted f
 | `momentum_pulse.json` | Latest intraday momentum pulse scan results (reversal signals) |
 | `expansion_proposals.json` | Pending/approved/rejected expansion proposals |
 | `approved_instruments.json` | User-approved instruments beyond the core set |
-| `portfolio_history.json` | Daily portfolio value snapshots for charting |
+| `portfolio_history.json` | Portfolio value snapshots for charting (total value, cash, per-position market values) |
 | `task_history.json` | Scheduled task execution history |
 | `reports/YYYY-MM-DD_report.md` | Daily morning reports |
 | `reports/YYYY-MM-DD_research.md` | Daily research snapshots |
