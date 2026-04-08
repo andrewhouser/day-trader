@@ -215,10 +215,10 @@ export function PortfolioChart() {
             />
             {positionTickers.map((ticker, i) => (
               <Line
-                key={ticker}
                 connectNulls
                 dataKey={ticker}
                 dot={false}
+                key={ticker}
                 stroke={POSITION_COLORS[i % POSITION_COLORS.length]}
                 strokeDasharray="4 2"
                 strokeWidth={1.5}
