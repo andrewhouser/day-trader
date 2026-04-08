@@ -193,7 +193,7 @@ export function PortfolioChart() {
                 borderRadius: 6,
                 fontSize: 13,
               }}
-              formatter={(v: number | string | undefined, name: string) => [`$${Number(v ?? 0).toFixed(2)}`, name]}
+              formatter={(v) => [`$${Number(v ?? 0).toFixed(2)}`]}
               labelFormatter={(v) => new Date(v as string).toLocaleString()}
             />
             <Legend wrapperStyle={{ fontSize: 12 }} />
