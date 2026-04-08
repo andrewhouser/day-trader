@@ -250,6 +250,15 @@ def run_risk_monitor() -> dict:
     # 1. Update trailing stops and check for auto-trades
     auto_trades = _update_trailing_stops(portfolio, instruments)
 
+    # Recalculate portfolio total after price updates so the dashboard
+    # reflects current market values (not the stale total from the last trade).
+    total_positions_value = sum(
+        p["quantity"] * p["current_price"] for p in portfolio.get("positions", [])
+    )
+    portfolio["total_value_usd"] = round(portfolio["cash_usd"] + total_positions_value, 2)
+    portfolio["all_time_high"] = max(portfolio.get("all_time_high", 0), portfolio["total_value_usd"])
+    portfolio["last_updated"] = datetime.now().isoformat()
+
     # Execute automatic trades (trailing stops and take-profits)
     auto_executed = []
     if auto_trades:
