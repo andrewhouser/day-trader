@@ -157,7 +157,7 @@ export function Dashboard() {
                   <td>
                     <span className="badge badge-blue">{pos.instrument_type}</span>
                   </td>
-                  <td>{pos.quantity}</td>
+                  <td>{typeof pos.quantity === 'number' ? (Number.isInteger(pos.quantity) ? pos.quantity : pos.quantity.toFixed(3)) : pos.quantity}</td>
                   <td>${pos.entry_price.toFixed(2)}</td>
                   <td>${pos.current_price.toFixed(2)}</td>
                   <td className={styles.trailingStopCell}>

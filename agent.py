@@ -171,14 +171,23 @@ def parse_trades_from_response(response: str, portfolio: dict) -> list[dict]:
 
 
 def validate_trade(trade: dict, portfolio: dict) -> tuple[bool, str]:
-    """Validate a trade against risk rules."""
+    """Validate a trade against risk rules.  Supports fractional shares."""
     action = trade.get("action", "").upper()
     ticker = trade.get("ticker", "")
     quantity = trade.get("quantity", 0)
     price = trade.get("price", 0)
 
+    if not quantity or quantity <= 0:
+        return False, "Quantity must be positive"
+    if not price or price <= 0:
+        return False, "Price must be positive"
+
     if ticker not in config.INSTRUMENTS:
         return False, f"Instrument {ticker} not in allowed scope"
+
+    # Normalize quantity to 3 decimal places
+    quantity = round(float(quantity), 3)
+    trade["quantity"] = quantity
 
     # Get regime-adjusted max position size
     regime_data = load_regime()
@@ -186,7 +195,7 @@ def validate_trade(trade: dict, portfolio: dict) -> tuple[bool, str]:
     max_pct = regime_params.get("max_position_pct", config.MAX_POSITION_PCT)
 
     if action == "BUY":
-        cost = quantity * price
+        cost = round(quantity * price, 2)
         if cost > portfolio["cash_usd"]:
             return False, f"Insufficient cash: need ${cost:.2f}, have ${portfolio['cash_usd']:.2f}"
         max_allowed = portfolio["total_value_usd"] * max_pct
@@ -194,30 +203,8 @@ def validate_trade(trade: dict, portfolio: dict) -> tuple[bool, str]:
         for pos in portfolio["positions"]:
             if pos["ticker"] == ticker:
                 existing_value = pos["quantity"] * pos["current_price"]
-        # Allow at least 1 share even if it exceeds the percentage cap.
-        # On small portfolios (< $5k), strict percentage limits make it
-        # impossible to buy any instrument priced above the dollar cap.
-        # For micro portfolios we use a graduated absolute ceiling:
-        #   - Portfolio < $2k  → 100% (any single share up to full value)
-        #   - Portfolio < $5k  → 50%
-        #   - Portfolio >= $5k → 25% (normal MAX_POSITION_PCT)
-        single_share_cost = price
-        if portfolio["total_value_usd"] < 2000:
-            abs_ceiling_pct = 1.0
-        elif portfolio["total_value_usd"] < 5000:
-            abs_ceiling_pct = 0.50
-        else:
-            abs_ceiling_pct = config.MAX_POSITION_PCT
-        absolute_max = portfolio["total_value_usd"] * abs_ceiling_pct
         if existing_value + cost > max_allowed:
-            if quantity == 1 and existing_value == 0 and single_share_cost <= absolute_max:
-                logger.info(
-                    f"Allowing 1-share override for {ticker}: ${cost:.2f} exceeds "
-                    f"{max_pct*100:.0f}% limit (${max_allowed:.2f}) but within "
-                    f"absolute ceiling ({abs_ceiling_pct*100:.0f}% = ${absolute_max:.2f})"
-                )
-            else:
-                return False, f"Position would exceed {max_pct*100:.0f}% limit (${max_allowed:.2f})"
+            return False, f"Position would exceed {max_pct*100:.0f}% limit (${max_allowed:.2f})"
 
     elif action == "SELL":
         position = None
@@ -227,8 +214,11 @@ def validate_trade(trade: dict, portfolio: dict) -> tuple[bool, str]:
                 break
         if not position:
             return False, f"No open position in {ticker}"
-        if quantity > position["quantity"]:
+        if quantity > position["quantity"] + 0.0005:  # tolerance for float rounding
             return False, f"Cannot sell {quantity} shares, only hold {position['quantity']}"
+        # Clamp to actual holdings to avoid tiny overflows
+        if quantity > position["quantity"]:
+            trade["quantity"] = position["quantity"]
     else:
         return False, f"Unknown action: {action}"
 
@@ -265,7 +255,7 @@ def execute_trade(trade: dict, portfolio: dict, technicals: dict | None = None) 
     trailing_stop_mult = regime_params.get("stop_atr_multiplier", config.TRAILING_STOP_ATR_MULTIPLIER)
 
     if action == "BUY":
-        cost = quantity * price
+        cost = round(quantity * price, 2)
         portfolio["cash_usd"] -= cost
         portfolio["cash_usd"] = round(portfolio["cash_usd"], 2)
 
@@ -276,7 +266,7 @@ def execute_trade(trade: dict, portfolio: dict, technicals: dict | None = None) 
                 break
 
         if existing:
-            total_qty = existing["quantity"] + quantity
+            total_qty = round(existing["quantity"] + quantity, 3)
             avg_price = ((existing["quantity"] * existing["entry_price"]) + cost) / total_qty
             existing["quantity"] = total_qty
             existing["entry_price"] = round(avg_price, 2)
@@ -295,7 +285,7 @@ def execute_trade(trade: dict, portfolio: dict, technicals: dict | None = None) 
             portfolio["positions"].append({
                 "ticker": ticker,
                 "instrument_type": config.INSTRUMENTS[ticker]["type"],
-                "quantity": quantity,
+                "quantity": round(quantity, 3),
                 "entry_price": price,
                 "entry_date": now.isoformat(),
                 "current_price": price,
@@ -310,7 +300,7 @@ def execute_trade(trade: dict, portfolio: dict, technicals: dict | None = None) 
     elif action == "SELL":
         for i, pos in enumerate(portfolio["positions"]):
             if pos["ticker"] == ticker:
-                proceeds = quantity * price
+                proceeds = round(quantity * price, 2)
                 portfolio["cash_usd"] += proceeds
                 portfolio["cash_usd"] = round(portfolio["cash_usd"], 2)
 
@@ -320,11 +310,12 @@ def execute_trade(trade: dict, portfolio: dict, technicals: dict | None = None) 
                 # correct cost basis after the position is removed from the list.
                 trade["_entry_price"] = pos["entry_price"]
 
-                if quantity >= pos["quantity"]:
+                remaining = round(pos["quantity"] - quantity, 3)
+                if remaining <= 0.0005:  # effectively zero
                     portfolio["positions"].pop(i)
                     position_closed = True
                 else:
-                    pos["quantity"] -= quantity
+                    pos["quantity"] = remaining
                     pos["current_price"] = price
                     pos["unrealized_pnl"] = round(
                         (price - pos["entry_price"]) * pos["quantity"], 2
@@ -378,9 +369,9 @@ def execute_trade(trade: dict, portfolio: dict, technicals: dict | None = None) 
 - **Date:** {now.strftime('%Y-%m-%d %H:%M:%S')}
 - **Action:** {action}
 - **Instrument:** {ticker} ({config.INSTRUMENTS[ticker]['tracks']})
-- **Quantity:** {quantity}
+- **Quantity:** {quantity:.3g}
 - **Price:** ${price}
-- **Total:** ${quantity * price:.2f}
+- **Total:** ${round(quantity * price, 2):.2f}
 {f'- **Realized P&L:** ${trade.get("realized_pnl", 0):.2f}' if action == 'SELL' else ''}{scores_line}{strategy_line}{hyp_lines}- **Reasoning:** {reasoning}
 - **Portfolio Balance:** ${portfolio['total_value_usd']:.2f}
 
@@ -457,8 +448,8 @@ def _run_bear_case_debate(trade: dict, market_context_snippet: str) -> tuple[boo
 
 Action: {action}
 Instrument: {ticker}
-Quantity: {quantity} shares @ ${price}
-Cost: ${quantity * price:.2f}
+Quantity: {quantity:.3g} shares @ ${price}
+Cost: ${round(quantity * price, 2):.2f}
 
 Agent's reasoning:
 {reasoning}
@@ -708,17 +699,16 @@ The following conditions were detected during research and triggered an immediat
     return response
 
 
-def _get_absolute_ceiling(total_value: float) -> float:
-    """Graduated absolute ceiling for 1-share override on small portfolios."""
-    if total_value < 2000:
-        return total_value * 1.0
-    elif total_value < 5000:
-        return total_value * 0.50
-    return total_value * config.MAX_POSITION_PCT
-
-
 def run_hourly_check():
     """Execute the market check and trading cycle."""
+    import time as _time
+    _cycle_start = _time.monotonic()
+    # Hard ceiling: if the cycle has been running longer than this, skip
+    # non-essential LLM calls (reflections) to avoid blocking the next run.
+    _CYCLE_BUDGET_SECS = config.HOURLY_CHECK_TIMEOUT + 120  # LLM budget + 2 min overhead
+
+    def _budget_remaining() -> float:
+        return _CYCLE_BUDGET_SECS - (_time.monotonic() - _cycle_start)
 
     def _get_weights_for_prompt() -> str:
         try:
@@ -1009,7 +999,7 @@ INSTRUCTIONS:
 {{
   "action": "BUY" or "SELL",
   "ticker": "SPY",
-  "quantity": 1,
+  "quantity": 0.195,
   "price": 512.40,
   "reasoning": "Your full reasoning here",
   "hypothesis": "What must be true for this trade to work (e.g. 'XLE will rise 3-5% over 3 sessions because crude supply constraint from OPEC cut')",
@@ -1036,7 +1026,7 @@ IMPORTANT: You must still output raw integer scores (-2 to +2) for each dimensio
 The weighted composite is computed by the system — output raw scores only.
 
 Remember: Max position size is regime-adjusted to {regime_params.get('max_position_pct', 0.25) * 100:.0f}% currently. You have ${portfolio['cash_usd']:.2f} in cash ({cash_pct:.0f}% of portfolio) and ${portfolio['total_value_usd']:.2f} total portfolio value. Buy threshold: {effective_buy_threshold}.
-IMPORTANT: On a small portfolio (under $5k), the 1-share override allows buying ANY single share as long as you have no existing position in that instrument and the share price is within the absolute ceiling. With your current portfolio of ${portfolio['total_value_usd']:.2f}, the absolute ceiling is ${_get_absolute_ceiling(portfolio['total_value_usd']):.2f}. Always use quantity=1 for instruments priced above ${portfolio['total_value_usd'] * regime_params.get('max_position_pct', config.MAX_POSITION_PCT):.2f}."""
+FRACTIONAL SHARES: You can buy fractional shares (e.g. 0.195 shares of SPY). Size positions by DOLLAR AMOUNT, not share count. To invest ${portfolio['total_value_usd'] * regime_params.get('max_position_pct', config.MAX_POSITION_PCT):.2f} (the {regime_params.get('max_position_pct', 0.25) * 100:.0f}% cap) in any instrument, divide that dollar amount by the share price to get the quantity. Round to 3 decimal places. The position sizing recommendations above already show the optimal fractional quantities — use them as a guide."""
 
     # 7. Get LLM decision (with confidence-gated temperature)
     logger.info(f"Sending analysis to LLM (temp={adaptive_temp:.2f})...")
@@ -1081,18 +1071,21 @@ IMPORTANT: On a small portfolio (under $5k), the 1-share override allows buying 
             bear_threshold = portfolio["total_value_usd"] * (config.BEAR_CASE_THRESHOLD_PCT / 100)
             bear_case_text = ""
             if trade.get("action", "").upper() == "BUY" and trade_cost >= bear_threshold:
-                market_snippet = f"{regime_summary}\n{vix_summary}\n{correlation_summary[:400]}"
-                _, bear_case_text = _run_bear_case_debate(trade, market_snippet)
-                # Append bear case to trade reasoning so it is logged and visible
-                trade["reasoning"] = (
-                    trade.get("reasoning", "")
-                    + f"\n\n[BEAR CASE ANALYSIS]\n{bear_case_text}"
-                )
-                logger.info(f"Bear case logged for {ticker} trade (${trade_cost:.2f})")
+                if _budget_remaining() < 120:
+                    logger.warning("Cycle budget low — skipping bear-case debate")
+                else:
+                    market_snippet = f"{regime_summary}\n{vix_summary}\n{correlation_summary[:400]}"
+                    _, bear_case_text = _run_bear_case_debate(trade, market_snippet)
+                    # Append bear case to trade reasoning so it is logged and visible
+                    trade["reasoning"] = (
+                        trade.get("reasoning", "")
+                        + f"\n\n[BEAR CASE ANALYSIS]\n{bear_case_text}"
+                    )
+                    logger.info(f"Bear case logged for {ticker} trade (${trade_cost:.2f})")
 
             logger.info(
                 f"Executing trade: {trade['action']} "
-                f"{trade['quantity']}x {trade['ticker']} @ ${trade['price']}"
+                f"{trade['quantity']:.3g}x {trade['ticker']} @ ${trade['price']}"
             )
             portfolio, was_closed = execute_trade(trade, portfolio, technicals)
             if was_closed:
@@ -1111,6 +1104,10 @@ IMPORTANT: On a small portfolio (under $5k), the 1-share override allows buying 
 
     # 9. Write reflections for closed positions (with hypothesis evaluation)
     for trade in closed_trades:
+        if _budget_remaining() < 60:
+            logger.warning("Cycle budget exhausted — skipping remaining closed-trade reflections")
+            break
+
         hypothesis = trade.get("hypothesis", "")
         falsified_by = trade.get("falsified_by", "")
         pnl = trade.get("realized_pnl", 0)
@@ -1129,7 +1126,7 @@ something else happen that the hypothesis didn't account for?
 """
 
         reflection_prompt = f"""You just closed a trade:
-- Sold {trade['quantity']}x {trade['ticker']} at ${trade['price']}
+- Sold {trade['quantity']:.3g}x {trade['ticker']} at ${trade['price']}
 - Realized P&L: ${pnl:.2f} ({outcome})
 - Original reasoning: {trade.get('reasoning', 'N/A')[:500]}
 {hyp_block}
@@ -1141,7 +1138,7 @@ Write a reflection covering:
 Be specific. Reference actual price levels and indicator values where possible.
 Keep it to 4-6 sentences."""
 
-        reflection = call_ollama(reflection_prompt)
+        reflection = call_ollama(reflection_prompt, timeout=config.OLLAMA_TIMEOUT)
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         pnl = trade.get("realized_pnl", 0)
         pnl_label = f"+${pnl:.2f}" if pnl >= 0 else f"-${abs(pnl):.2f}"
@@ -1159,7 +1156,10 @@ Keep it to 4-6 sentences."""
         else "No trades — held positions"
     )
 
-    reflection_prompt = f"""You just completed an hourly market analysis cycle at {now}.
+    if _budget_remaining() < 60:
+        logger.warning("Cycle budget exhausted — skipping cycle reflection")
+    else:
+        reflection_prompt = f"""You just completed an hourly market analysis cycle at {now}.
 
 Action taken: {action_summary}
 Market regime: {regime_data.get('regime', 'UNKNOWN')}
@@ -1170,15 +1170,15 @@ Here is your full analysis from this cycle:
 Write a brief 2-3 sentence reflection on this analysis cycle for your learning log.
 Focus on: What did you observe? Was there anything surprising? What will you watch for next hour?"""
 
-    hourly_reflection = call_ollama(reflection_prompt)
-    append_to_file(
-        config.REFLECTIONS_PATH,
-        f"\n## Market Check Reflection - {now}\n"
-        f"**Action:** {action_summary}\n"
-        f"**Regime:** {regime_data.get('regime', 'UNKNOWN')}\n\n"
-        f"{hourly_reflection}\n\n---\n",
-    )
-    logger.info("Market check reflection written")
+        hourly_reflection = call_ollama(reflection_prompt, timeout=config.OLLAMA_TIMEOUT)
+        append_to_file(
+            config.REFLECTIONS_PATH,
+            f"\n## Market Check Reflection - {now}\n"
+            f"**Action:** {action_summary}\n"
+            f"**Regime:** {regime_data.get('regime', 'UNKNOWN')}\n\n"
+            f"{hourly_reflection}\n\n---\n",
+        )
+        logger.info("Market check reflection written")
 
     # Mark overseas signals as evaluated now that the cycle is complete
     if pending_overseas_signals:
@@ -1186,7 +1186,8 @@ Focus on: What did you observe? Was there anything surprising? What will you wat
         mark_signals_evaluated(signal_ids)
         logger.info(f"Marked {len(signal_ids)} overseas signal(s) as evaluated")
 
-    logger.info("Market check complete")
+    elapsed = _time.monotonic() - _cycle_start
+    logger.info(f"Market check complete (elapsed: {elapsed:.0f}s)")
 
 
 def run_morning_report():
@@ -1270,7 +1271,7 @@ Write the full morning report with these sections:
 
 Be specific and honest. Do not omit trades or rationalize poor decisions."""
 
-    report = call_ollama(prompt, model=config.REPORT_MODEL)
+    report = call_ollama(prompt, model=config.REPORT_MODEL, timeout=config.REPORT_TIMEOUT)
 
     # Save report
     today = datetime.now().strftime("%Y-%m-%d")

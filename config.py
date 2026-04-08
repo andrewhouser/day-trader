@@ -16,6 +16,7 @@ HOURLY_CHECK_TIMEOUT = int(os.getenv("HOURLY_CHECK_TIMEOUT", "600"))  # Extended
 EVENTS_TIMEOUT = int(os.getenv("EVENTS_TIMEOUT", "600"))  # Extended timeout for events calendar (seconds)
 RESEARCH_TIMEOUT = int(os.getenv("RESEARCH_TIMEOUT", "600"))  # Extended timeout for research agent (seconds)
 PERFORMANCE_TIMEOUT = int(os.getenv("PERFORMANCE_TIMEOUT", "900"))  # Extended timeout for performance analyst (seconds)
+REPORT_TIMEOUT = int(os.getenv("REPORT_TIMEOUT", "600"))  # Extended timeout for morning report (seconds)
 
 # Scheduling (cron-style, all times in TIMEZONE)
 # NOTE: APScheduler from_crontab uses ISO weekdays: 0=Mon … 6=Sun
@@ -299,6 +300,7 @@ INSTRUMENT SCOPE:
 
 RISK RULES:
 - Never put more than the regime-adjusted max % of total portfolio value into a single position (default 25%, reduced in downtrends/volatility).
+- Fractional shares are supported — size positions by dollar amount, not whole shares. Divide the target dollar amount by the share price and round to 3 decimal places.
 - Position sizes should be volatility-scaled: volatile instruments get smaller positions.
 - Trailing stops and take-profit targets are managed automatically — respect them.
 - Do not be fully invested unless conditions are clearly favorable.

@@ -2,6 +2,12 @@
 
 ## 2026-04-08
 
+### Added
+- **Fractional share support** — the agent can now buy and sell fractional shares (e.g. 0.195 shares of SPY at $512.40 = $100 position). Positions are sized by dollar amount divided by share price, rounded to 3 decimal places. This eliminates the entire class of "position would exceed X% limit" rejections that blocked all trading on the $1,000 portfolio, since the agent can now buy exactly the dollar amount the percentage cap allows regardless of share price.
+
+### Removed
+- **1-share override and graduated absolute ceiling** — no longer needed now that fractional shares allow precise dollar-based sizing at any portfolio size.
+
 ### Fixed
 - **Trade validation blocked all purchases on micro portfolios** — the 1-share override (added 2026-04-07) had an absolute ceiling of 25% of portfolio value ($250 on a $1,000 portfolio), which is below the share price of most ETFs (SPY ~$677, QQQ ~$480, GLD ~$431). The agent repeatedly attempted trades that were rejected, resulting in zero trades over two days. Replaced the fixed 25% ceiling with a graduated scale: portfolios under $2k get a 100% ceiling (can buy any single share affordable with cash), under $5k get 50%, and $5k+ use the normal 25%. The LLM prompt now shows the actual absolute ceiling so it stops attempting unaffordable trades.
 - **`max_pct` NameError in hourly check prompt** — the prompt string in `run_hourly_check()` referenced `max_pct`, a variable only defined in the separate `validate_trade()` function. Replaced with inline `regime_params.get('max_position_pct', config.MAX_POSITION_PCT)`.

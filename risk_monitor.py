@@ -271,7 +271,7 @@ def run_risk_monitor() -> dict:
                 from agent import validate_trade
                 valid, reason = validate_trade(trade, portfolio)
                 if valid:
-                    logger.warning(f"Auto-executing {trade_info['type']}: {trade['action']} {trade['quantity']}x {trade['ticker']}")
+                    logger.warning(f"Auto-executing {trade_info['type']}: {trade['action']} {trade['quantity']:.3g}x {trade['ticker']}")
                     portfolio, _ = execute_trade(trade, portfolio, technicals)
                     auto_executed.append(trade_info)
                     all_alerts.append({
@@ -320,7 +320,7 @@ def run_risk_monitor() -> dict:
             descriptions.append(
                 f"🛑 STOP-LOSS: {a['ticker']} dropped {a['drop_pct']}% "
                 f"from entry ${a['entry_price']} → ${a['current_price']} "
-                f"({a['quantity']} shares)"
+                f"({a['quantity']:.3g} shares)"
             )
         elif a["type"] == "trailing_stop":
             descriptions.append(f"🔻 TRAILING STOP EXECUTED: {a.get('detail', a['ticker'])}")
