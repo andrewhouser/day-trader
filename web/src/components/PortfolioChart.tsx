@@ -45,10 +45,27 @@ function formatTick(iso: string, days: number) {
   return d.toLocaleDateString([], { month: "short", year: "2-digit" });
 }
 
+const STORAGE_KEY = "portfolioChartRange";
+
+function getSavedRange(): number {
+  if (typeof window === "undefined") return 30;
+  const saved = localStorage.getItem(STORAGE_KEY);
+  if (saved) {
+    const n = Number(saved);
+    if (RANGES.some((r) => r.days === n)) return n;
+  }
+  return 30;
+}
+
 export function PortfolioChart() {
   const [data, setData] = useState<PortfolioSnapshot[]>([]);
   const [loading, setLoading] = useState(true);
-  const [range, setRange] = useState(30);
+  const [range, setRange] = useState(getSavedRange);
+
+  function changeRange(days: number) {
+    setRange(days);
+    localStorage.setItem(STORAGE_KEY, String(days));
+  }
 
   useEffect(() => {
     setLoading(true);
@@ -89,7 +106,7 @@ export function PortfolioChart() {
             <button
               className={`badge ${range === r.days ? "badge-blue" : "badge-gray"} ${styles.rangeButton}`}
               key={r.days}
-              onClick={() => setRange(r.days)}
+              onClick={() => changeRange(r.days)}
             >
               {r.label}
             </button>
