@@ -102,13 +102,16 @@ export function PortfolioChart() {
   const chartData = useMemo(
     () =>
       data.map((s) => {
-        const row: Record<string, number | string> = {
+        const row: Record<string, number | string | undefined> = {
           time: s.timestamp,
           "Portfolio Value": s.total_value_usd,
           Cash: s.cash_usd,
         };
         for (const ticker of positionTickers) {
-          row[ticker] = s.positions?.[ticker] ?? 0;
+          // Use undefined (not 0) when position doesn't exist yet so the
+          // line starts at the first real data point instead of drawing to $0
+          const val = s.positions?.[ticker];
+          if (val !== undefined && val > 0) row[ticker] = val;
         }
         return row;
       }),
