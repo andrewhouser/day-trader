@@ -476,6 +476,7 @@ environment:
   - RESEARCH_TIMEOUT=600
   - EVENTS_TIMEOUT=600
   - PERFORMANCE_TIMEOUT=900
+  - REPORT_TIMEOUT=600
   # Overseas monitors (APScheduler: 0=Mon..6=Sun)
   - NIKKEI_OPEN_CRON=*/10 19-22 * * 6,0-3
   - NIKKEI_REOPEN_CRON=*/15 23 * * 6,0-3

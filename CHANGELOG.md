@@ -4,12 +4,15 @@
 
 ### Added
 - **Fractional share support** — the agent can now buy and sell fractional shares (e.g. 0.195 shares of SPY at $512.40 = $100 position). Positions are sized by dollar amount divided by share price, rounded to 3 decimal places. This eliminates the entire class of "position would exceed X% limit" rejections that blocked all trading on the $1,000 portfolio, since the agent can now buy exactly the dollar amount the percentage cap allows regardless of share price.
+- **Market Check cycle budget** — the hourly check now tracks wall-clock elapsed time (`HOURLY_CHECK_TIMEOUT + 120s`). Before each non-essential LLM call (bear-case debate, closed-trade reflections, cycle reflection), it checks remaining budget and skips if time is running low. Prevents the cycle from blocking the next scheduled run. Elapsed time is logged at the end of each cycle.
+- **`REPORT_TIMEOUT`** (default 600s) — dedicated timeout for the morning report LLM call, added to `config.py` and `docker-compose.yml`. Previously fell back to the 300s default `OLLAMA_TIMEOUT`.
 
 ### Removed
 - **1-share override and graduated absolute ceiling** — no longer needed now that fractional shares allow precise dollar-based sizing at any portfolio size.
 
 ### Fixed
-- **Trade validation blocked all purchases on micro portfolios** — the 1-share override (added 2026-04-07) had an absolute ceiling of 25% of portfolio value ($250 on a $1,000 portfolio), which is below the share price of most ETFs (SPY ~$677, QQQ ~$480, GLD ~$431). The agent repeatedly attempted trades that were rejected, resulting in zero trades over two days. Replaced the fixed 25% ceiling with a graduated scale: portfolios under $2k get a 100% ceiling (can buy any single share affordable with cash), under $5k get 50%, and $5k+ use the normal 25%. The LLM prompt now shows the actual absolute ceiling so it stops attempting unaffordable trades.
+- **Morning report timing out** — `run_morning_report()` called `call_ollama()` without an explicit timeout, falling back to the 300s default which was too short. Now uses `REPORT_TIMEOUT` (600s).
+- **Market Check reflection calls missing explicit timeouts** — the closed-trade reflection and cycle reflection `call_ollama()` calls inside `run_hourly_check()` used the default 300s timeout. Now pass `config.OLLAMA_TIMEOUT` explicitly.
 - **`max_pct` NameError in hourly check prompt** — the prompt string in `run_hourly_check()` referenced `max_pct`, a variable only defined in the separate `validate_trade()` function. Replaced with inline `regime_params.get('max_position_pct', config.MAX_POSITION_PCT)`.
 
 ## 2026-04-06 (proactive trading tuning)
