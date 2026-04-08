@@ -174,7 +174,10 @@ def start_background_scheduler() -> BackgroundScheduler:
 
     load_approved_into_config()
 
-    _bg_scheduler = BackgroundScheduler(timezone=config.TIMEZONE)
+    _bg_scheduler = BackgroundScheduler(
+        timezone=config.TIMEZONE,
+        executors={"default": {"type": "threadpool", "max_workers": 4}},
+    )
     _add_jobs(_bg_scheduler)
     _bg_scheduler.start()
 
@@ -264,7 +267,10 @@ def main():
     logger.info(f"Data directory: {config.DATA_DIR}")
     logger.info("=" * 60)
 
-    scheduler = BlockingScheduler(timezone=config.TIMEZONE)
+    scheduler = BlockingScheduler(
+        timezone=config.TIMEZONE,
+        executors={"default": {"type": "threadpool", "max_workers": 4}},
+    )
     _add_jobs(scheduler)
 
     def shutdown(signum, frame):

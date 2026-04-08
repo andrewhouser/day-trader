@@ -25,6 +25,12 @@ logger = logging.getLogger(__name__)
 # can bail out early when a stop is requested.
 _thread_local = threading.local()
 
+# Global lock that serializes all Ollama LLM requests.  APScheduler runs
+# jobs in a thread pool (default 20 threads), so without this lock
+# multiple agents fire simultaneously and queue up on the GPU, keeping
+# it at 100% with no idle time for the model to unload.
+_ollama_lock = threading.Lock()
+
 
 class TaskCancelledError(Exception):
     """Raised when a task's stop flag is set."""
@@ -76,7 +82,11 @@ def call_ollama(
         },
     }
     try:
-        resp = requests.post(url, json=payload, timeout=timeout if timeout is not None else config.OLLAMA_TIMEOUT)
+        # Serialize all LLM requests so only one agent uses the GPU at a time.
+        # Without this, concurrent agents queue on Ollama and keep the GPU
+        # pegged at 100% with no idle window for the model to unload.
+        with _ollama_lock:
+            resp = requests.post(url, json=payload, timeout=timeout if timeout is not None else config.OLLAMA_TIMEOUT)
         resp.raise_for_status()
         return resp.json().get("response", "")
     except requests.exceptions.RequestException as e:
