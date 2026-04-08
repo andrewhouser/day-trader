@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import {
   Area,
   AreaChart,
   CartesianGrid,
   Legend,
+  Line,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -25,6 +26,20 @@ const RANGES = [
   { days: 180, label: "6M" },
   { days: 365, label: "1Y" },
 ] as const;
+
+// Distinct colors for position lines (avoid green/blue used by totals)
+const POSITION_COLORS = [
+  "#f59e0b", // amber
+  "#ef4444", // red
+  "#a855f7", // purple
+  "#ec4899", // pink
+  "#14b8a6", // teal
+  "#f97316", // orange
+  "#6366f1", // indigo
+  "#84cc16", // lime
+  "#06b6d4", // cyan
+  "#e879f9", // fuchsia
+];
 
 function describeSpan(data: PortfolioSnapshot[]): string {
   if (data.length === 0) return "";
@@ -72,11 +87,33 @@ export function PortfolioChart() {
     api.getPortfolioHistory(range).then(setData).finally(() => setLoading(false));
   }, [range]);
 
-  const chartData = data.map((s) => ({
-    Cash: s.cash_usd,
-    "Portfolio Value": s.total_value_usd,
-    time: s.timestamp,
-  }));
+  // Collect all unique position tickers across the history
+  const positionTickers = useMemo(() => {
+    const tickers = new Set<string>();
+    for (const s of data) {
+      if (s.positions) {
+        for (const t of Object.keys(s.positions)) tickers.add(t);
+      }
+    }
+    return Array.from(tickers).sort();
+  }, [data]);
+
+  // Build chart data with dynamic position keys
+  const chartData = useMemo(
+    () =>
+      data.map((s) => {
+        const row: Record<string, number | string> = {
+          time: s.timestamp,
+          "Portfolio Value": s.total_value_usd,
+          Cash: s.cash_usd,
+        };
+        for (const ticker of positionTickers) {
+          row[ticker] = s.positions?.[ticker] ?? 0;
+        }
+        return row;
+      }),
+    [data, positionTickers],
+  );
 
   const selectedLabel = RANGES.find((r) => r.days === range)?.label ?? "";
   const spanText = describeSpan(data);
@@ -156,7 +193,7 @@ export function PortfolioChart() {
                 borderRadius: 6,
                 fontSize: 13,
               }}
-              formatter={(v) => [`$${Number(v).toFixed(2)}`]}
+              formatter={(v: number, name: string) => [`$${v.toFixed(2)}`, name]}
               labelFormatter={(v) => new Date(v as string).toLocaleString()}
             />
             <Legend wrapperStyle={{ fontSize: 12 }} />
@@ -176,6 +213,18 @@ export function PortfolioChart() {
               strokeWidth={1.5}
               type="monotone"
             />
+            {positionTickers.map((ticker, i) => (
+              <Line
+                key={ticker}
+                connectNulls
+                dataKey={ticker}
+                dot={false}
+                stroke={POSITION_COLORS[i % POSITION_COLORS.length]}
+                strokeDasharray="4 2"
+                strokeWidth={1.5}
+                type="monotone"
+              />
+            ))}
           </AreaChart>
         </ResponsiveContainer>
       )}

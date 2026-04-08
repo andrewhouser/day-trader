@@ -127,6 +127,13 @@ def _record_portfolio_snapshot(portfolio: dict):
         "total_value_usd": portfolio["total_value_usd"],
         "cash_usd": portfolio["cash_usd"],
     }
+    # Record per-position market values so the chart can show individual lines
+    positions = portfolio.get("positions", [])
+    if positions:
+        snapshot["positions"] = {
+            pos["ticker"]: round(pos["quantity"] * pos["current_price"], 2)
+            for pos in positions
+        }
     try:
         with open(config.PORTFOLIO_HISTORY_PATH, "r") as f:
             history = json.load(f)

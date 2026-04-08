@@ -130,6 +130,7 @@ export interface PortfolioSnapshot {
   timestamp: string;
   total_value_usd: number;
   cash_usd: number;
+  positions?: Record<string, number>;
 }
 
 export interface ExpansionProposal {
