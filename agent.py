@@ -194,17 +194,27 @@ def validate_trade(trade: dict, portfolio: dict) -> tuple[bool, str]:
         for pos in portfolio["positions"]:
             if pos["ticker"] == ticker:
                 existing_value = pos["quantity"] * pos["current_price"]
-        # Allow at least 1 share even if it exceeds the percentage cap,
-        # as long as the cost doesn't exceed the absolute ceiling (25%).
-        # On small portfolios, strict percentage limits make it impossible
-        # to buy any instrument priced above the dollar cap.
+        # Allow at least 1 share even if it exceeds the percentage cap.
+        # On small portfolios (< $5k), strict percentage limits make it
+        # impossible to buy any instrument priced above the dollar cap.
+        # For micro portfolios we use a graduated absolute ceiling:
+        #   - Portfolio < $2k  → 100% (any single share up to full value)
+        #   - Portfolio < $5k  → 50%
+        #   - Portfolio >= $5k → 25% (normal MAX_POSITION_PCT)
         single_share_cost = price
-        absolute_max = portfolio["total_value_usd"] * config.MAX_POSITION_PCT
+        if portfolio["total_value_usd"] < 2000:
+            abs_ceiling_pct = 1.0
+        elif portfolio["total_value_usd"] < 5000:
+            abs_ceiling_pct = 0.50
+        else:
+            abs_ceiling_pct = config.MAX_POSITION_PCT
+        absolute_max = portfolio["total_value_usd"] * abs_ceiling_pct
         if existing_value + cost > max_allowed:
             if quantity == 1 and existing_value == 0 and single_share_cost <= absolute_max:
                 logger.info(
                     f"Allowing 1-share override for {ticker}: ${cost:.2f} exceeds "
-                    f"{max_pct*100:.0f}% limit (${max_allowed:.2f}) but within absolute ceiling"
+                    f"{max_pct*100:.0f}% limit (${max_allowed:.2f}) but within "
+                    f"absolute ceiling ({abs_ceiling_pct*100:.0f}% = ${absolute_max:.2f})"
                 )
             else:
                 return False, f"Position would exceed {max_pct*100:.0f}% limit (${max_allowed:.2f})"
@@ -698,6 +708,15 @@ The following conditions were detected during research and triggered an immediat
     return response
 
 
+def _get_absolute_ceiling(total_value: float) -> float:
+    """Graduated absolute ceiling for 1-share override on small portfolios."""
+    if total_value < 2000:
+        return total_value * 1.0
+    elif total_value < 5000:
+        return total_value * 0.50
+    return total_value * config.MAX_POSITION_PCT
+
+
 def run_hourly_check():
     """Execute the market check and trading cycle."""
 
@@ -1017,7 +1036,7 @@ IMPORTANT: You must still output raw integer scores (-2 to +2) for each dimensio
 The weighted composite is computed by the system — output raw scores only.
 
 Remember: Max position size is regime-adjusted to {regime_params.get('max_position_pct', 0.25) * 100:.0f}% currently. You have ${portfolio['cash_usd']:.2f} in cash ({cash_pct:.0f}% of portfolio) and ${portfolio['total_value_usd']:.2f} total portfolio value. Buy threshold: {effective_buy_threshold}.
-IMPORTANT: On a small portfolio, many ETFs cost more per share than the percentage cap allows. You may buy exactly 1 share of any instrument as long as it costs less than 25% of portfolio value (${portfolio['total_value_usd'] * 0.25:.2f}). Always use quantity=1 for instruments priced above ${portfolio['total_value_usd'] * max_pct:.2f}."""
+IMPORTANT: On a small portfolio (under $5k), the 1-share override allows buying ANY single share as long as you have no existing position in that instrument and the share price is within the absolute ceiling. With your current portfolio of ${portfolio['total_value_usd']:.2f}, the absolute ceiling is ${_get_absolute_ceiling(portfolio['total_value_usd']):.2f}. Always use quantity=1 for instruments priced above ${portfolio['total_value_usd'] * regime_params.get('max_position_pct', config.MAX_POSITION_PCT):.2f}."""
 
     # 7. Get LLM decision (with confidence-gated temperature)
     logger.info(f"Sending analysis to LLM (temp={adaptive_temp:.2f})...")

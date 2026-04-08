@@ -250,7 +250,7 @@ Regime detection uses: SPY price vs SMA 50/200, golden/death cross, RSI, VIX lev
 
 ### Rule-Based Controls
 - Regime-adjusted max position size (25% in uptrends, 10–15% in downtrends/volatility)
-- Absolute ceiling of 25% of portfolio in any single position
+- 1-share override for small portfolios: when the regime percentage cap is too low for even a single share, the agent may buy exactly 1 share if the price is within a graduated absolute ceiling (100% for portfolios under $2k, 50% under $5k, 25% at $5k+)
 - Configurable stop-loss threshold (default: 3% drop from entry)
 - Configurable opportunity threshold (default: 2% intraday surge)
 - Volatility alert threshold (default: 2.5% intraday range)

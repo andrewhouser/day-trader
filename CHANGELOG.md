@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-04-08
+
+### Fixed
+- **Trade validation blocked all purchases on micro portfolios** — the 1-share override (added 2026-04-07) had an absolute ceiling of 25% of portfolio value ($250 on a $1,000 portfolio), which is below the share price of most ETFs (SPY ~$677, QQQ ~$480, GLD ~$431). The agent repeatedly attempted trades that were rejected, resulting in zero trades over two days. Replaced the fixed 25% ceiling with a graduated scale: portfolios under $2k get a 100% ceiling (can buy any single share affordable with cash), under $5k get 50%, and $5k+ use the normal 25%. The LLM prompt now shows the actual absolute ceiling so it stops attempting unaffordable trades.
+- **`max_pct` NameError in hourly check prompt** — the prompt string in `run_hourly_check()` referenced `max_pct`, a variable only defined in the separate `validate_trade()` function. Replaced with inline `regime_params.get('max_position_pct', config.MAX_POSITION_PCT)`.
+
 ## 2026-04-06 (proactive trading tuning)
 
 ### Added
