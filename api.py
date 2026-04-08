@@ -893,6 +893,16 @@ def get_market_context():
         return {"content": "No market context available yet. Run the Market Context agent to generate one."}
 
 
+@app.get("/api/benchmark")
+def get_benchmark():
+    """Return portfolio vs SPY benchmark comparison."""
+    from benchmark import compute_benchmark_comparison
+    try:
+        return compute_benchmark_comparison()
+    except Exception as e:
+        return {"error": str(e)}
+
+
 @app.get("/api/exchange-calendar")
 def get_exchange_calendar_status():
     """Return current exchange session status, holidays, and DST info."""

@@ -811,6 +811,10 @@ def run_hourly_check():
     from performance_analyst import get_performance_feedback
     perf_feedback = get_performance_feedback()
 
+    # 5.1 Portfolio-level benchmark comparison
+    from benchmark import get_benchmark_for_prompt
+    benchmark_feedback = get_benchmark_for_prompt()
+
     # 5a. Confidence-gated temperature — exploit known patterns vs. explore novel ones
     from playbook_agent import get_adaptive_temperature
     adaptive_temp = get_adaptive_temperature()
@@ -921,6 +925,8 @@ def run_hourly_check():
 ### Historical Performance Feedback
 {perf_feedback}
 
+{benchmark_feedback}
+
 ---
 
 INSTRUCTIONS:
@@ -941,6 +947,7 @@ INSTRUCTIONS:
 7. Check the risk alerts — if the risk monitor flagged stop-losses, drawdowns, or volatility, address them explicitly.
 8. Check the economic events calendar — avoid opening new positions ahead of high-impact events unless you have strong conviction.
 9. Review the HISTORICAL PERFORMANCE FEEDBACK. Learn from past patterns — if you tend to sell winners too early or hold losers too long, adjust.
+9.1. **BENCHMARK COMPARISON** — Check the Portfolio vs Benchmark section above. If you are underperforming SPY buy-and-hold, you MUST address why in your analysis and adjust your approach. High cash drag means you are too cautious — deploy capital. Negative alpha means your active trading is destroying value vs. passive investing. Read the ⚡ suggestions and act on them.
 9.5. Consult the STRATEGY PLAYBOOK. If a current setup matches a documented pattern with a known win rate, use that as a prior. High-confidence patterns (≥65% win rate, 8+ trades) warrant a stronger signal. Low-sample patterns are hypotheses — treat them accordingly.
 9.6. Check SUSPENDED STRATEGIES. Any strategy flagged ⛔ has empirically failed — do not execute trades that primarily rely on that approach.
 9.7. **SPECULATIVE OPPORTUNITIES** — Review the Speculation Agent's output above. These are asymmetric risk/reward setups identified by a separate analyst. They are SUGGESTIONS, not orders.

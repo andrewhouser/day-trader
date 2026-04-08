@@ -310,6 +310,14 @@ The performance analyst generates per-trade stats fed back into the trading prom
 - Pattern detection (e.g., "You tend to sell winners too early and hold losers too long")
 - Closed trade reflections compare predicted outcome vs actual outcome
 
+### Portfolio vs Benchmark
+Every trading cycle includes a portfolio-level comparison against SPY buy-and-hold over the same time period (`benchmark.py`). Metrics include:
+- Portfolio return vs SPY return (alpha)
+- Average cash allocation (cash drag)
+- Annualized Sharpe-like ratio (risk-adjusted return)
+
+When the portfolio underperforms the benchmark, concrete suggestions are injected into the prompt (e.g., "UNDERPERFORMING BENCHMARK: alpha -2.3%, deploy more capital"). The trading agent is instructed to address benchmark underperformance explicitly in its analysis. Available via `GET /api/benchmark`.
+
 ### Strategy Tracking & Playbook
 Every trade is classified into one of 9 strategy categories (momentum_continuation, sector_rotation, mean_reversion, sector_divergence, contrarian_breakout, event_catalyst, vix_spike_rotation, stop_management, take_profit). The system tracks win/loss/neutral counts and win rate per strategy. Strategies with ≥10 trades and <35% win rate are automatically suspended and flagged in the trading prompt.
 

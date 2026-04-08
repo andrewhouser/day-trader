@@ -4,6 +4,7 @@
 
 ### Added
 - **Fractional share support** — the agent can now buy and sell fractional shares (e.g. 0.195 shares of SPY at $512.40 = $100 position). Positions are sized by dollar amount divided by share price, rounded to 3 decimal places. This eliminates the entire class of "position would exceed X% limit" rejections that blocked all trading on the $1,000 portfolio, since the agent can now buy exactly the dollar amount the percentage cap allows regardless of share price.
+- **Portfolio vs benchmark feedback loop** (`benchmark.py`) — computes portfolio return vs SPY buy-and-hold over the same period, calculates alpha, average cash drag, and an annualized Sharpe-like ratio. Generates concrete actionable suggestions (e.g., "UNDERPERFORMING BENCHMARK: alpha -2.3%, consider deploying more capital") that are injected into every trading prompt. New instruction 9.1 tells the LLM to address benchmark underperformance explicitly. New API endpoint `GET /api/benchmark` exposes the metrics.
 - **Market Check cycle budget** — the hourly check now tracks wall-clock elapsed time (`HOURLY_CHECK_TIMEOUT + 120s`). Before each non-essential LLM call (bear-case debate, closed-trade reflections, cycle reflection), it checks remaining budget and skips if time is running low. Prevents the cycle from blocking the next scheduled run. Elapsed time is logged at the end of each cycle.
 - **`REPORT_TIMEOUT`** (default 600s) — dedicated timeout for the morning report LLM call, added to `config.py` and `docker-compose.yml`. Previously fell back to the 300s default `OLLAMA_TIMEOUT`.
 
