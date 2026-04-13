@@ -1248,23 +1248,37 @@ def run_morning_report():
     gain_loss = portfolio["total_value_usd"] - portfolio["starting_capital"]
     pct_return = (gain_loss / portfolio["starting_capital"]) * 100
 
+    # Pre-format portfolio into human-readable text so the LLM doesn't
+    # echo raw JSON back into the report.
+    positions_text = ""
+    for pos in portfolio.get("positions", []):
+        pnl_sign = "+" if pos["unrealized_pnl"] >= 0 else ""
+        qty = pos["quantity"] if isinstance(pos["quantity"], int) or pos["quantity"] == int(pos["quantity"]) else f"{pos['quantity']:.3f}"
+        positions_text += (
+            f"- {pos['ticker']} ({pos['instrument_type']}): {qty} shares, "
+            f"entry ${pos['entry_price']:.2f}, current ${pos['current_price']:.2f}, "
+            f"P&L {pnl_sign}${pos['unrealized_pnl']:.2f}, "
+            f"trailing stop ${pos.get('trailing_stop', 'N/A')}\n"
+            f"  Notes: {pos.get('notes', 'N/A')}\n"
+        )
+    if not positions_text:
+        positions_text = "No open positions — fully in cash.\n"
+
     prompt = f"""Morning Report
 
 Generate a daily trading report. Today is {datetime.now().strftime('%Y-%m-%d')}.
 
-### Current Portfolio State
-```json
-{json.dumps(portfolio, indent=2)}
-```
-
-### Performance
+### Portfolio Summary
+- Cash: ${portfolio['cash_usd']:.2f}
+- Total Value: ${portfolio['total_value_usd']:.2f}
 - Starting Capital: $1,000.00
-- Current Value: ${portfolio['total_value_usd']:.2f}
-- Gain/Loss: ${gain_loss:+.2f}
-- Return: {pct_return:+.2f}%
+- Gain/Loss: ${gain_loss:+.2f} ({pct_return:+.2f}%)
 - All-Time High: ${portfolio['all_time_high']:.2f}
 - All-Time Low: ${portfolio['all_time_low']:.2f}
 - Total Trades: {portfolio['trade_count']}
+
+### Open Positions
+{positions_text}
 
 {overseas_block}
 
@@ -1282,9 +1296,12 @@ Generate a daily trading report. Today is {datetime.now().strftime('%Y-%m-%d')}.
 
 ---
 
+IMPORTANT: Write the report in plain markdown prose. Do NOT include any JSON blocks or raw data dumps.
+Use bullet points, tables, and headers — not code blocks with JSON.
+
 Write the full morning report with these sections:
-1. Portfolio Summary (cash, total value, gain/loss, % return)
-2. Open Positions (ticker, entry price, current price, quantity, unrealized P&L, rationale)
+1. Portfolio Summary (cash, total value, gain/loss, % return — as formatted text, NOT JSON)
+2. Open Positions (a markdown table with columns: Ticker, Qty, Entry, Current, P&L, Notes)
 3. Asia Overnight Recap (Nikkei direction, key themes, divergence from prior U.S. close)
 4. Europe-at-Open Recap (FTSE direction, key themes, Asia-to-Europe handoff)
 5. Cross-Market Handoff Summary (what Asia and Europe are telling us about the U.S. day ahead, key risks and catalysts)

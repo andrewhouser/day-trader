@@ -6,6 +6,7 @@
   --border: #1e293b;
   --green: #22c55e;
   --purple: #a855f7;
+  --orange: #f97316;
   --red: #ef4444;
   --text: #e2e8f0;
   --text-muted: #94a3b8;
@@ -134,6 +135,11 @@ a:hover {
 .badge-yellow {
   background: rgba(234, 179, 8, 0.15);
   color: var(--yellow);
+}
+
+.badge-orange {
+  background: rgba(249, 115, 22, 0.15);
+  color: var(--orange);
 }
 
 /* ── Buttons ────────────────────────────────────────────────────── */

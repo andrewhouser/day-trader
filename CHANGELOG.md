@@ -1,5 +1,25 @@
 # Changelog
 
+## 2026-04-13
+
+### Added
+- **Crisis detection and defensive selling** — the sentiment agent now scans raw headlines for high-severity macro crisis patterns (war declarations, military strikes, pandemic emergencies, banking collapses, sovereign defaults, market crashes, circuit breakers, assassinations, terrorist attacks). Requires ≥2 matching headlines to fire (avoids false positives). When triggered, writes `crisis_alert.json`. The risk monitor picks it up and sends the LLM a focused prompt asking which cyclical positions to sell. Defensive instruments (XLU, XLP, TLT, SHY, GLD, AGG, BND) are never sold by crisis logic. 6-hour cooldown between reviews (`CRISIS_COOLDOWN_HOURS`). Crisis sells appear as `🚨 CRISIS SELL EXECUTED` in risk alerts and wake the trader for an immediate review cycle.
+- **Ollama error indicators on dashboard** — task failures caused by Ollama connectivity issues or timeouts now show a distinct orange badge (`⚡ Ollama unreachable` or `⏱ Ollama timeout`) on both the Dashboard scheduled tasks table and the Tasks page (task cards + execution history). New `web/src/lib/ollamaErrors.ts` utility classifies error strings against known Ollama failure patterns.
+- **Ticker history chart for Index Tracker** — clicking any market index (DOW, NASDAQ, S&P 500, Nikkei, FTSE) in the top bar opens a price history popup with 1D/7D/1M/3M/6M/1Y range selector.
+- **Ticker history chart for Expansion proposals** — clicking a proposal's ticker on the Expansion page opens the same price history popup, letting you review an instrument's chart before approving or rejecting.
+- **Reusable `TickerChart` component** (`web/src/components/TickerChart.tsx`) — extracted from `PositionChart` with optional entry price and trailing stop reference lines. Used by IndexTracker and Expansion.
+- **New config entries**: `CRISIS_ALERT_PATH`, `CRISIS_COOLDOWN_HOURS`, `CRISIS_DEFENSIVE_TICKERS`
+- **New CSS**: `--orange` color variable, `.badge-orange` style for Ollama error indicators
+
+### Changed
+- **Trader frequency doubled** — Market Check now runs every 15 minutes (was 30) during market hours (`0,15,30,45 9-16`). Research staggered to every 15 minutes offset by 5 (`5,20,35,50 9-16`) to avoid GPU contention. Both updated in `.env` and `docker-compose.yml`.
+- **Morning report no longer outputs JSON** — the prompt now feeds a pre-formatted text summary of the portfolio instead of raw `portfolio.json`, and explicitly instructs the LLM to use markdown prose with tables instead of JSON code blocks. Positions are rendered as a markdown table.
+- **Model assignments updated** — `RESEARCH_MODEL` → `qwen3.5:latest`, `REPORT_MODEL` → `llama3.2`, `EVENTS_MODEL` → `llama3.2`, `COMPACTION_MODEL` → `qwen2.5:7b`. Synced across `config.py`, `.env`, and `docker-compose.yml`.
+- **Ollama IP updated** — `OLLAMA_BASE_URL` changed from `192.168.0.240` to `192.168.0.250` in `.env`.
+
+### Fixed
+- **Market Context crash on malformed P&L** — `_parse_recent_trades()` regex `[-\d.]+` matched `-0.03-` (a corrupted trade log entry where P&L and Strategy fields were concatenated without a newline). Replaced with `[-]?\d+\.?\d*\b` which requires a proper number format with word boundary. Also fixed the corrupted entry in `trade_log.md`.
+
 ## 2026-04-08
 
 ### Added

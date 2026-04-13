@@ -7,6 +7,7 @@ News source priority:
   2. Finviz RSS feed — no key required, public RSS
   3. yfinance ticker.news — fallback if both above fail
 """
+import json
 import logging
 import os
 import re
@@ -290,6 +291,78 @@ def _ensure_file():
             f.write("# Sentiment Log\n\nSentiment scores from news headline analysis.\n\n---\n")
 
 
+# ── Crisis detection ───────────────────────────────────────
+
+import re as _re
+
+_CRISIS_PATTERNS = [
+    _re.compile(p, _re.IGNORECASE) for p in [
+        r"\b(?:declare[sd]?|enter(?:s|ing)?|launch(?:es|ed)?|start(?:s|ed)?)\s+(?:a\s+)?war\b",
+        r"\bmilitary\s+(?:strike|attack|invasion|conflict|action)\b",
+        r"\bnuclear\s+(?:strike|threat|attack|weapon)\b",
+        r"\bpandemic\s+(?:declared|emergency|outbreak)\b",
+        r"\bglobal\s+(?:pandemic|health\s+emergency)\b",
+        r"\bsanctions?\s+(?:escalat|expand|broaden|sweeping|massive)\b",
+        r"\bembargo\b",
+        r"\bdefault(?:s|ed)?\s+on\s+(?:debt|bonds?|treasury|sovereign)\b",
+        r"\bsovereign\s+debt\s+crisis\b",
+        r"\bbank(?:ing)?\s+(?:collapse|crisis|run|failure|contagion)\b",
+        r"\bsystemic\s+(?:risk|crisis|failure|collapse)\b",
+        r"\bmarket\s+(?:crash|meltdown|panic|freefall)\b",
+        r"\bcircuit\s+breaker(?:s)?\s+(?:triggered|hit|tripped)\b",
+        r"\bblack\s+(?:monday|swan|tuesday)\b",
+        r"\bmarshall\s+law\b|\bmartial\s+law\b",
+        r"\bcoup\s+(?:attempt|d.état)\b",
+        r"\bassassinat(?:ion|ed)\b.*(?:president|leader|prime\s+minister)\b",
+        r"\bterrorist?\s+attack\b",
+    ]
+]
+
+
+def _scan_for_crisis(news: dict[str, list[str]]) -> dict | None:
+    """Scan raw headlines for macro crisis signals.
+
+    Returns a crisis alert dict if high-severity patterns are detected,
+    or None if headlines look normal.
+    """
+    matches = []
+    for symbol, headlines in news.items():
+        for headline in headlines:
+            for pattern in _CRISIS_PATTERNS:
+                if pattern.search(headline):
+                    matches.append({"headline": headline, "symbol": symbol, "pattern": pattern.pattern})
+                    break  # one match per headline is enough
+
+    if not matches:
+        return None
+
+    # Require at least 2 matching headlines to avoid false positives from
+    # a single sensational headline
+    if len(matches) < 2:
+        logger.info(f"Crisis scan: only {len(matches)} match — below threshold, ignoring")
+        return None
+
+    return {
+        "timestamp": datetime.now().isoformat(),
+        "match_count": len(matches),
+        "matches": matches[:10],  # cap stored matches
+        "summary": "; ".join(m["headline"][:120] for m in matches[:5]),
+    }
+
+
+def _write_crisis_alert(alert: dict):
+    """Write a crisis alert to disk for the risk monitor to pick up."""
+    try:
+        with open(config.CRISIS_ALERT_PATH, "w") as f:
+            json.dump(alert, f, indent=2)
+        logger.warning(
+            f"🚨 CRISIS ALERT written: {alert['match_count']} headline matches — "
+            f"{alert['summary'][:200]}"
+        )
+    except Exception as e:
+        logger.error(f"Failed to write crisis alert: {e}")
+
+
 def run_sentiment() -> str:
     """Run a sentiment analysis cycle."""
     logger.info("Starting sentiment analysis cycle...")
@@ -358,5 +431,10 @@ Format each instrument score as:
 """
     append_to_file(config.SENTIMENT_PATH, entry)
     logger.info(f"Sentiment analysis saved to {config.SENTIMENT_PATH}")
+
+    # ── Crisis headline scan ───────────────────────────────
+    crisis_alert = _scan_for_crisis(news)
+    if crisis_alert:
+        _write_crisis_alert(crisis_alert)
 
     return response

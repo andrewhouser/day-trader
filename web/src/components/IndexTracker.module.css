@@ -23,6 +23,15 @@
   border-right: none;
 }
 
+.clickable {
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.clickable:hover {
+  background: var(--bg-card-hover);
+}
+
 .indexMuted {
   color: var(--text-muted);
   font-size: 0.85rem;

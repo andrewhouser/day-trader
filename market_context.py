@@ -71,7 +71,7 @@ def _parse_recent_trades(days: int = 30) -> list[dict]:
             continue
 
         ticker_match = re.search(r"\*\*Instrument:\*\*\s*(\w+)", section)
-        pnl_match = re.search(r"\*\*Realized P&L:\*\*\s*\$([-\d.]+)", section)
+        pnl_match = re.search(r"\*\*Realized P&L:\*\*\s*\$([-]?\d+\.?\d*)\b", section)
 
         trades.append({
             "date": date_match.group(1),

@@ -4,12 +4,15 @@ import { useEffect, useState } from "react";
 
 import { api, ExpansionProposal } from "@/lib/api";
 
+import { TickerChart } from "./TickerChart";
+
 import styles from "./Expansion.module.css";
 
 type FilterStatus = "" | "approved" | "pending" | "rejected";
 
 export function Expansion() {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [chartTicker, setChartTicker] = useState<string | null>(null);
   const [filter, setFilter] = useState<FilterStatus>("");
   const [instruments, setInstruments] = useState<Record<string, { tracks: string; type: string }>>({});
   const [loading, setLoading] = useState(true);
@@ -133,7 +136,14 @@ export function Expansion() {
           >
             <div className={styles.proposalHeader}>
               <div>
-                <span className={styles.proposalTicker}>{p.ticker}</span>
+                <span
+                  className={styles.proposalTicker}
+                  onClick={(e) => { e.stopPropagation(); setChartTicker(p.ticker); }}
+                  style={{ cursor: "pointer" }}
+                  title={`View ${p.ticker} price history`}
+                >
+                  {p.ticker}
+                </span>
                 <span
                   className={`badge ${p.instrument_type === "Stock" ? "badge-green" : p.instrument_type.includes("Bond") || p.instrument_type.includes("Treasury") ? "badge-yellow" : "badge-blue"}`}
                 >
@@ -197,6 +207,14 @@ export function Expansion() {
             </div>
           </div>
         ))
+      )}
+
+      {chartTicker && (
+        <TickerChart
+          onClose={() => setChartTicker(null)}
+          ticker={chartTicker}
+          title={`${chartTicker} Price History`}
+        />
       )}
     </div>
   );

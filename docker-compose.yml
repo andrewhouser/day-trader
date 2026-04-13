@@ -6,12 +6,12 @@ services:
     environment:
       - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
       - TRADER_MODEL_NAME=${TRADER_MODEL_NAME:-deepseek-r1:14b}
-      - RESEARCH_MODEL=${RESEARCH_MODEL:-qwen2.5:7b}
-      - REPORT_MODEL=${REPORT_MODEL:-qwen2.5:7b}
+      - RESEARCH_MODEL=${RESEARCH_MODEL:-qwen3.5:latest}
+      - REPORT_MODEL=${REPORT_MODEL:-llama3.2}
       - SENTIMENT_MODEL=${SENTIMENT_MODEL:-llama3.1:8b}
-      - EVENTS_MODEL=${EVENTS_MODEL:-qwen2.5:7b}
+      - EVENTS_MODEL=${EVENTS_MODEL:-llama3.2}
       - EXPANSION_MODEL=${EXPANSION_MODEL:-qwen3.5:latest}
-      - COMPACTION_MODEL=${COMPACTION_MODEL:-phi3:3.8b}
+      - COMPACTION_MODEL=${COMPACTION_MODEL:-qwen2.5:7b}
       - TEMPERATURE=0.3
       - RESEARCH_TIMEOUT=600
       - EVENTS_TIMEOUT=600
@@ -24,9 +24,9 @@ services:
       - FTSE_OPEN_CRON=${FTSE_OPEN_CRON:-*/10 2-5 * * 0-4}
       - EUROPE_HANDOFF_CRON=${EUROPE_HANDOFF_CRON:-30 5 * * 0-4}
       # Core trading loop
-      - HOURLY_CRON=0,30 9-16 * * 0-4
+      - HOURLY_CRON=0,15,30,45 9-16 * * 0-4
       - MORNING_REPORT_CRON=0 7 * * 0-4
-      - RESEARCH_CRON=5/10 9-16 * * 0-4
+      - RESEARCH_CRON=5,20,35,50 9-16 * * 0-4
       - STOP_LOSS_PCT=3.0
       - OPPORTUNITY_PCT=2.0
       - COMPACTION_CRON=0 5 * * 0-4

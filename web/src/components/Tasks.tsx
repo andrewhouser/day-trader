@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import { api, TaskHistoryEntry, TaskInfo } from "@/lib/api";
 import { groupTasksByCategory } from "@/lib/constants";
 import { cronToHuman } from "@/lib/cron";
+import { classifyOllamaError, ollamaErrorLabel } from "@/lib/ollamaErrors";
 
 import { ScheduleEditor } from "./ScheduleEditor";
 
@@ -163,7 +164,14 @@ export function Tasks() {
                 </>
               )}
               {task.last_run?.error && (
-                <div className={styles.errorText}>Error: {task.last_run.error}</div>
+                <div className={styles.errorText}>
+                  {classifyOllamaError(task.last_run.error) ? (
+                    <span className="badge badge-orange" style={{ marginRight: 6 }}>
+                      {ollamaErrorLabel(classifyOllamaError(task.last_run.error))}
+                    </span>
+                  ) : null}
+                  Error: {task.last_run.error}
+                </div>
               )}
             </div>
 
@@ -223,7 +231,18 @@ export function Tasks() {
                   <td className={styles.historyDateCell}>
                     {entry.finished_at ? new Date(entry.finished_at).toLocaleString() : "—"}
                   </td>
-                  <td className={styles.historyErrorCell}>{entry.error || "—"}</td>
+                  <td className={styles.historyErrorCell}>
+                    {entry.error ? (
+                      <>
+                        {classifyOllamaError(entry.error) && (
+                          <span className="badge badge-orange" style={{ marginRight: 6 }}>
+                            {ollamaErrorLabel(classifyOllamaError(entry.error))}
+                          </span>
+                        )}
+                        {entry.error}
+                      </>
+                    ) : "—"}
+                  </td>
                 </tr>
               ))}
             </tbody>

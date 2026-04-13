@@ -92,6 +92,12 @@
   margin-right: 0.5rem;
 }
 
+.proposalTicker:hover {
+  text-decoration: underline;
+  text-decoration-color: var(--blue);
+  text-underline-offset: 2px;
+}
+
 .rationale {
   font-size: 0.85rem;
   line-height: 1.5;

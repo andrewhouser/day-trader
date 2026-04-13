@@ -202,6 +202,146 @@ def _update_trailing_stops(portfolio: dict, instruments: dict) -> list[dict]:
     return auto_trades
 
 
+def _check_crisis_alert(portfolio: dict, instruments: dict) -> list[dict]:
+    """Check for a pending crisis alert from the sentiment agent.
+
+    If a recent crisis alert exists and hasn't been acted on within the
+    cooldown window, ask the LLM whether to sell cyclical positions and
+    move to cash/defensives. Returns auto-trade actions.
+    """
+    try:
+        with open(config.CRISIS_ALERT_PATH, "r") as f:
+            alert = json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return []
+
+    # Check cooldown — don't re-evaluate the same crisis repeatedly
+    alert_time = datetime.fromisoformat(alert["timestamp"])
+    age_hours = (datetime.now() - alert_time).total_seconds() / 3600
+    if age_hours > config.CRISIS_COOLDOWN_HOURS:
+        return []  # stale alert, ignore
+
+    # Check if we already acted on this alert (marker field)
+    if alert.get("acted"):
+        return []
+
+    positions = portfolio.get("positions", [])
+    if not positions:
+        logger.info("Crisis alert active but no positions to defend — skipping")
+        # Mark as acted so we don't keep checking
+        alert["acted"] = True
+        with open(config.CRISIS_ALERT_PATH, "w") as f:
+            json.dump(alert, f, indent=2)
+        return []
+
+    # Build position summary for the LLM
+    defensive_set = set(config.CRISIS_DEFENSIVE_TICKERS)
+    position_lines = []
+    for pos in positions:
+        ticker = pos["ticker"]
+        data = instruments.get(ticker, {})
+        current = data.get("price", pos.get("current_price", pos["entry_price"]))
+        pnl = round((current - pos["entry_price"]) * pos["quantity"], 2)
+        is_defensive = "DEFENSIVE" if ticker in defensive_set else "CYCLICAL"
+        position_lines.append(
+            f"- {ticker} ({is_defensive}): {pos['quantity']:.3g} shares, "
+            f"entry ${pos['entry_price']:.2f}, current ${current:.2f}, P&L ${pnl:+.2f}"
+        )
+    positions_block = "\n".join(position_lines)
+
+    crisis_summary = alert.get("summary", "Unknown crisis event")
+
+    prompt = f"""CRISIS PORTFOLIO REVIEW
+
+The sentiment scanner has detected a potential macro crisis event based on
+multiple news headlines:
+
+{crisis_summary}
+
+Your current positions:
+{positions_block}
+
+Cash available: ${portfolio['cash_usd']:.2f}
+Total portfolio: ${portfolio['total_value_usd']:.2f}
+
+DEFENSIVE instruments (safe to hold): {', '.join(config.CRISIS_DEFENSIVE_TICKERS)}
+Everything else is considered CYCLICAL and vulnerable to a crisis sell-off.
+
+INSTRUCTIONS:
+1. Assess whether these headlines represent a genuine systemic risk or just noise.
+2. If genuine, recommend which CYCLICAL positions to sell to raise cash.
+3. Do NOT sell defensive positions (bonds, gold, utilities, staples).
+4. Be decisive — in a real crisis, speed matters more than precision.
+
+Output your decision as a JSON array of sells (empty array if no action needed):
+```json
+[
+  {{"action": "SELL", "ticker": "XYZ", "quantity": 1.0, "reasoning": "..."}},
+]
+```
+
+If you believe this is NOT a genuine crisis (sensational headlines, already priced in,
+or low probability of market impact), output an empty array and explain why."""
+
+    logger.warning(f"🚨 Crisis review triggered — {alert['match_count']} headline matches")
+    response = call_ollama(prompt, timeout=config.OLLAMA_TIMEOUT)
+    logger.info(f"Crisis review response received ({len(response)} chars)")
+
+    # Log the crisis review
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    append_to_file(
+        config.RISK_ALERTS_PATH,
+        f"\n## 🚨 Crisis Review - {now}\n\n"
+        f"**Trigger:** {crisis_summary}\n\n"
+        f"**LLM Assessment:**\n{response}\n\n---\n",
+    )
+
+    # Parse sell recommendations
+    auto_trades = []
+    import re as _re
+    json_pattern = r'```json\s*(.*?)\s*```'
+    for match in _re.findall(json_pattern, response, _re.DOTALL):
+        try:
+            sells = json.loads(match)
+            if isinstance(sells, list):
+                for sell in sells:
+                    if sell.get("action", "").upper() == "SELL" and sell.get("ticker"):
+                        # Find the position to get the right quantity
+                        ticker = sell["ticker"]
+                        pos = next((p for p in positions if p["ticker"] == ticker), None)
+                        if pos and ticker not in defensive_set:
+                            data = instruments.get(ticker, {})
+                            price = data.get("price", pos.get("current_price", pos["entry_price"]))
+                            auto_trades.append({
+                                "type": "crisis_defensive",
+                                "action": "SELL",
+                                "ticker": ticker,
+                                "quantity": pos["quantity"],  # sell full position
+                                "price": price,
+                                "reasoning": (
+                                    f"CRISIS DEFENSIVE SELL: {ticker} — "
+                                    f"{sell.get('reasoning', crisis_summary)}"
+                                ),
+                            })
+                break
+        except json.JSONDecodeError:
+            continue
+
+    # Mark alert as acted on regardless of outcome
+    alert["acted"] = True
+    alert["review_time"] = datetime.now().isoformat()
+    alert["trades_recommended"] = len(auto_trades)
+    with open(config.CRISIS_ALERT_PATH, "w") as f:
+        json.dump(alert, f, indent=2)
+
+    if auto_trades:
+        logger.warning(f"Crisis review recommends {len(auto_trades)} defensive sell(s)")
+    else:
+        logger.info("Crisis review: no sells recommended — LLM assessed as non-critical or already priced in")
+
+    return auto_trades
+
+
 def run_risk_monitor() -> dict:
     """Run a risk monitoring cycle. Returns dict of alerts found.
 
@@ -315,6 +455,42 @@ def run_risk_monitor() -> dict:
     if corr_alert:
         all_alerts.append(corr_alert)
 
+    # 6. Crisis detection — macro event-driven defensive selling
+    crisis_trades = _check_crisis_alert(portfolio, instruments)
+    if crisis_trades:
+        try:
+            technicals = fetch_technical_indicators()
+        except Exception:
+            technicals = None
+        for trade_info in crisis_trades:
+            trade = {
+                "action": trade_info["action"],
+                "ticker": trade_info["ticker"],
+                "quantity": trade_info["quantity"],
+                "price": trade_info["price"],
+                "reasoning": trade_info["reasoning"],
+            }
+            try:
+                from agent import validate_trade
+                valid, reason = validate_trade(trade, portfolio)
+                if valid:
+                    logger.warning(
+                        f"Crisis sell: {trade['action']} {trade['quantity']:.3g}x "
+                        f"{trade['ticker']} @ ${trade['price']}"
+                    )
+                    portfolio, _ = execute_trade(trade, portfolio, technicals)
+                    auto_executed.append(trade_info)
+                    all_alerts.append({
+                        "type": "crisis_defensive",
+                        "ticker": trade_info["ticker"],
+                        "action": "EXECUTED",
+                        "detail": trade_info["reasoning"],
+                    })
+                else:
+                    logger.warning(f"Crisis sell rejected: {reason}")
+            except Exception as e:
+                logger.error(f"Failed to execute crisis sell for {trade_info['ticker']}: {e}")
+
     if not all_alerts:
         logger.info("Risk monitor: no alerts detected.")
         return {"alerts": [], "action_taken": False, "auto_trades": []}
@@ -350,6 +526,8 @@ def run_risk_monitor() -> dict:
             descriptions.append(
                 f"🔗 CORRELATION: All positions ({tickers}) moving {a['direction']} together"
             )
+        elif a["type"] == "crisis_defensive":
+            descriptions.append(f"🚨 CRISIS SELL EXECUTED: {a.get('detail', a['ticker'])}")
 
     alert_text = "\n".join(descriptions)
     logger.warning(f"Risk monitor detected {len(all_alerts)} alert(s):\n{alert_text}")
@@ -372,7 +550,7 @@ def run_risk_monitor() -> dict:
     append_to_file(config.RISK_ALERTS_PATH, entry)
 
     # Determine if we need to wake the trader (only for non-auto-handled alerts)
-    critical_types = {"stop_loss", "drawdown"}
+    critical_types = {"stop_loss", "drawdown", "crisis_defensive"}
     has_critical = any(a["type"] in critical_types for a in all_alerts)
 
     if has_critical:

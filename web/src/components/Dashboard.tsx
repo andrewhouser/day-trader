@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { api, Portfolio, Position, TaskInfo } from "@/lib/api";
 import { groupTasksByCategory } from "@/lib/constants";
 import { cronToHuman } from "@/lib/cron";
+import { classifyOllamaError, ollamaErrorLabel } from "@/lib/ollamaErrors";
 
 import { PortfolioChart } from "./PortfolioChart";
 import { PositionChart } from "./PositionChart";
@@ -219,11 +220,18 @@ export function Dashboard() {
                 </td>
                 <td>
                   {task.last_run ? (
-                    <span
-                      className={`badge ${task.last_run.status === "completed" ? "badge-green" : task.last_run.status === "failed" || task.last_run.status === "cancelled" ? "badge-red" : "badge-yellow"}`}
-                    >
-                      {task.last_run.status}
-                    </span>
+                    <>
+                      <span
+                        className={`badge ${task.last_run.status === "completed" ? "badge-green" : task.last_run.status === "failed" || task.last_run.status === "cancelled" ? "badge-red" : "badge-yellow"}`}
+                      >
+                        {task.last_run.status}
+                      </span>
+                      {task.last_run.status === "failed" && classifyOllamaError(task.last_run.error) && (
+                        <span className="badge badge-orange" style={{ marginLeft: 4 }}>
+                          {ollamaErrorLabel(classifyOllamaError(task.last_run.error))}
+                        </span>
+                      )}
+                    </>
                   ) : (
                     <span className="badge badge-gray">—</span>
                   )}

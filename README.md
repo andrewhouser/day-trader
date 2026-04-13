@@ -27,7 +27,7 @@ The project is split into two services that run together via Docker Compose:
 │  │  ── Core Trading Loop ───────────────────────────────────  │  │
 │  │  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌─────────────┐  │  │
 │  │  │ Research  │ │ Trader   │ │Sentiment │ │   Risk      │  │  │
-│  │  │ (10 min) │ │ (30 min) │ │  (3x/d)  │ │  (3 min)    │  │  │
+│  │  │ (15 min) │ │ (15 min) │ │  (3x/d)  │ │  (3 min)    │  │  │
 │  │  └──────────┘ └──────────┘ └──────────┘ └─────────────┘  │  │
 │  │  ┌──────────┐                                              │  │
 │  │  │ Momentum │                                              │  │
@@ -96,16 +96,16 @@ The system runs nineteen scheduled agents organized into four categories:
 
 | Agent | Schedule | Model | Description |
 |-------|----------|-------|-------------|
-| Market Research | Every 10 min (9 AM–4 PM) | `qwen3.5:latest` | Gathers data from 7 sources (FRED, Finnhub, SEC EDGAR, Alpha Vantage, Finviz, Reuters, Investing.com), produces structured research notes, checks stop-loss/opportunity alerts. Triggers the trader if alerts fire. |
-| Market Check | Every 30 min (9 AM–4 PM) | `deepseek-r1:14b` | Full trading cycle — reads research, sentiment, risk alerts, events, technicals, regime, overseas signals, playbook, intraday reversals, momentum pulse, and scoring framework. Scores instruments with dynamic buy threshold (reduced when cash is high), runs bear-case debate on large trades, executes trades, writes reflections. |
-| Morning Report | 7:00 AM weekdays | `qwen2.5:7b` | Daily summary with portfolio state, overnight global recap (Asia + Europe), trades, performance, and outlook. |
+| Market Research | Every 15 min (9 AM–4 PM) | `qwen3.5:latest` | Gathers data from 7 sources (FRED, Finnhub, SEC EDGAR, Alpha Vantage, Finviz, Reuters, Investing.com), produces structured research notes, checks stop-loss/opportunity alerts. Triggers the trader if alerts fire. |
+| Market Check | Every 15 min (9 AM–4 PM) | `deepseek-r1:14b` | Full trading cycle — reads research, sentiment, risk alerts, events, technicals, regime, overseas signals, playbook, intraday reversals, momentum pulse, and scoring framework. Scores instruments with dynamic buy threshold (reduced when cash is high), runs bear-case debate on large trades, executes trades, writes reflections. Staggered 5 minutes after research to avoid GPU contention. |
+| Morning Report | 7:00 AM weekdays | `llama3.2` | Daily summary with portfolio state, overnight global recap (Asia + Europe), trades, performance, and outlook. |
 
 ### Intelligence Agents
 
 | Agent | Schedule | Model | Description |
 |-------|----------|-------|-------------|
-| Sentiment Analysis | 8 AM, 12 PM, 4 PM weekdays | `llama3.1:8b` | Scrapes news headlines via yfinance, scores each instrument as bullish/neutral/bearish with confidence levels. |
-| Events Calendar | 6:00 AM weekdays | `qwen2.5:7b` | Fetches upcoming economic events (FOMC, jobs, CPI, earnings) so the trader can avoid opening positions ahead of high-impact announcements. |
+| Sentiment Analysis | 8 AM, 12 PM, 4 PM weekdays | `llama3.1:8b` | Scrapes news headlines via yfinance, scores each instrument as bullish/neutral/bearish with confidence levels. Includes crisis headline scanner that detects macro catastrophe patterns (war, pandemic, banking collapse) and triggers defensive portfolio review. |
+| Events Calendar | 6:00 AM weekdays | `llama3.2` | Fetches upcoming economic events (FOMC, jobs, CPI, earnings) so the trader can avoid opening positions ahead of high-impact announcements. |
 | Market Context | 6:55 AM weekdays | `qwen3.5:latest` | Computes rolling 30-day portfolio arc, regime transitions, trade statistics, best/worst instruments, and correlation structure. |
 | Strategy Playbook | 6:30 AM Fridays | Research model | Reads all trade history and reflections, extracts recurring patterns with empirical win rates. High-confidence patterns get more weight; failing strategies get suspended. |
 | Speculation Analysis | 10 AM, 11 AM, 1 PM, 2 PM, 3 PM weekdays | Research model | Scans for asymmetric risk/reward setups the conservative trading agent might miss. Produces 1-3 speculative theses with targets, stops, reward/risk ratios, and invalidation points. Runs 5x daily to catch midday reversals. |
@@ -115,7 +115,7 @@ The system runs nineteen scheduled agents organized into four categories:
 
 | Agent | Schedule | Model | Description |
 |-------|----------|-------|-------------|
-| Risk Monitor | Every 3 min (9 AM–4 PM) | None (rule-based) | Watches for trailing stop breaches, take-profit targets, portfolio drawdown, volatility spikes, and position correlation. Automatically executes stops and take-profits. Recalculates portfolio total value from current market prices every cycle. |
+| Risk Monitor | Every 3 min (9 AM–4 PM) | None (rule-based) | Watches for trailing stop breaches, take-profit targets, portfolio drawdown, volatility spikes, position correlation, and crisis alerts. Automatically executes stops, take-profits, and crisis defensive sells. Recalculates portfolio total value from current market prices every cycle. |
 | Portfolio Rebalancer | 6:00 AM Mondays | `qwen3.5:latest` | Analyzes allocation drift, concentration risk, and cash drag. Suggests and executes rebalancing trades. |
 | Expansion Analysis | 7:00 AM Wednesdays | `qwen3.5:latest` | Evaluates potential new instruments for portfolio diversification. Proposals require user approval before trading. |
 | Performance Analyst | 6:00 AM Fridays | `qwen3.5:latest` | Computes win rate, profit factor, per-instrument breakdown, max drawdown, holding period analysis, and pattern detection. Updates adaptive score weights. |
@@ -199,8 +199,9 @@ The agent uses multiple models for different tasks, balancing quality vs. speed:
 | Trader | `deepseek-r1:14b` | Market check (trading decisions, deep reasoning) |
 | Research / Analysis | `qwen3.5:latest` | Research, rebalancer, performance, expansion, market context |
 | Overseas / Playbook | `qwen3.5:latest` (or `OVERSEAS_MODEL` / `PLAYBOOK_MODEL` override) | Nikkei monitors, FTSE monitor, Europe handoff, strategy playbook |
-| Intelligence | `llama3.1:8b` / `qwen2.5:7b` | Sentiment (`llama3.1:8b`), events (`qwen2.5:7b`), morning report (`qwen2.5:7b`) |
-| Summarization | `phi3:3.8b` | Memory compaction |
+| Report / Events | `llama3.2` | Morning report, events calendar |
+| Sentiment | `llama3.1:8b` | Sentiment analysis and crisis headline scanning |
+| Summarization | `qwen2.5:7b` | Memory compaction |
 
 The risk monitor is purely rule-based and does not call the LLM.
 
@@ -304,7 +305,13 @@ After a position is closed, the reflection explicitly evaluates whether the hypo
 ### Adversarial Bear-Case Debate
 For BUY trades exceeding 5% of portfolio value (configurable via `BEAR_CASE_THRESHOLD_PCT`), a skeptical risk-analyst agent argues the strongest case against the trade before execution. The bear case is appended to the trade's reasoning in the log.
 
+### Crisis Detection & Defensive Selling
+The sentiment agent scans raw news headlines for high-severity macro crisis patterns every cycle (8 AM, 12 PM, 4 PM). Detected patterns include: war declarations, military strikes/invasions, pandemic emergencies, banking collapses, sovereign debt defaults, market crashes, circuit breaker triggers, and major political assassinations. Requires ≥2 matching headlines to fire (avoids false positives from sensational one-off headlines).
+
+When triggered, the risk monitor sends the LLM a focused prompt listing all positions classified as CYCLICAL vs DEFENSIVE, and asks which cyclicals to sell. Defensive instruments (XLU, XLP, TLT, SHY, GLD, AGG, BND) are never sold by crisis logic. A 6-hour cooldown (`CRISIS_COOLDOWN_HOURS`) prevents repeated reviews of the same event. Crisis sells appear as `🚨 CRISIS SELL EXECUTED` in risk alerts and immediately wake the trading agent for a full review cycle.
+
 ### Quantitative Feedback Loop
+
 The performance analyst generates per-trade stats fed back into the trading prompt:
 - Win rate, average win/loss %, profit factor
 - Average holding period for wins vs losses
@@ -404,6 +411,7 @@ All persistent state lives in the `trader/` directory, which is volume-mounted f
 | `strategy_scores.json` | Per-strategy win/loss tracking and suspension status |
 | `speculation.md` | Speculative opportunity theses from the speculation agent |
 | `momentum_pulse.json` | Latest intraday momentum pulse scan results (reversal signals) |
+| `crisis_alert.json` | Active crisis alert from headline scanner (consumed by risk monitor) |
 | `expansion_proposals.json` | Pending/approved/rejected expansion proposals |
 | `approved_instruments.json` | User-approved instruments beyond the core set |
 | `portfolio_history.json` | Portfolio value snapshots for charting (total value, cash, per-position market values) |
@@ -456,8 +464,8 @@ To prevent unbounded file growth, a compaction agent runs daily at 5 AM and:
   ollama pull deepseek-r1:14b
   ollama pull qwen3.5:latest
   ollama pull qwen2.5:7b
+  ollama pull llama3.2
   ollama pull llama3.1:8b
-  ollama pull phi3:3.8b
   ```
 
 ### Configuration
@@ -476,11 +484,11 @@ environment:
   - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
   - TRADER_MODEL_NAME=deepseek-r1:14b
   - RESEARCH_MODEL=qwen3.5:latest
-  - REPORT_MODEL=qwen2.5:7b
+  - REPORT_MODEL=llama3.2
   - SENTIMENT_MODEL=llama3.1:8b
-  - EVENTS_MODEL=qwen2.5:7b
+  - EVENTS_MODEL=llama3.2
   - EXPANSION_MODEL=qwen3.5:latest
-  - COMPACTION_MODEL=phi3:3.8b
+  - COMPACTION_MODEL=qwen2.5:7b
   - TEMPERATURE=0.3
   # Timeouts
   - RESEARCH_TIMEOUT=600
@@ -494,8 +502,8 @@ environment:
   - FTSE_OPEN_CRON=*/10 2-5 * * 0-4
   - EUROPE_HANDOFF_CRON=30 5 * * 0-4
   # Core trading loop
-  - HOURLY_CRON=0,30 9-16 * * 0-4
-  - RESEARCH_CRON=5/10 9-16 * * 0-4
+  - HOURLY_CRON=0,15,30,45 9-16 * * 0-4
+  - RESEARCH_CRON=5,20,35,50 9-16 * * 0-4
   - MORNING_REPORT_CRON=0 7 * * 0-4
   # Intelligence agents
   - SENTIMENT_CRON=0 8,12,16 * * 0-4

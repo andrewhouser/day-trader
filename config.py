@@ -5,11 +5,11 @@ import os
 OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://host.docker.internal:11434")
 TRADER_MODEL_NAME = os.getenv("TRADER_MODEL_NAME", "deepseek-r1:14b")  # Trading agent (complex reasoning, trade decisions)
 RESEARCH_MODEL = os.getenv("RESEARCH_MODEL", "qwen3.5:latest")  # Research, summarizer, performance, rebalancer (analysis/long context)
-REPORT_MODEL = os.getenv("REPORT_MODEL", "qwen2.5:7b")  # Morning report (formatting/summarization)
+REPORT_MODEL = os.getenv("REPORT_MODEL", "llama3.2")  # Morning report (formatting/summarization)
 SENTIMENT_MODEL = os.getenv("SENTIMENT_MODEL", "llama3.1:8b")  # Sentiment agent (classification)
-EVENTS_MODEL = os.getenv("EVENTS_MODEL", "qwen2.5:7b")  # Events calendar (structured generation, fast)
+EVENTS_MODEL = os.getenv("EVENTS_MODEL", "llama3.2")  # Events calendar (structured generation, fast)
 EXPANSION_MODEL = os.getenv("EXPANSION_MODEL", "qwen3.5:latest")  # Expansion analysis (portfolio analysis)
-COMPACTION_MODEL = os.getenv("COMPACTION_MODEL", "phi3:3.8b")  # Compaction (lightweight summarization)
+COMPACTION_MODEL = os.getenv("COMPACTION_MODEL", "qwen2.5:7b")  # Compaction (lightweight summarization)
 TEMPERATURE = float(os.getenv("TEMPERATURE", "0.3"))
 OLLAMA_TIMEOUT = int(os.getenv("OLLAMA_TIMEOUT", "300"))  # Default timeout for Ollama requests (seconds)
 HOURLY_CHECK_TIMEOUT = int(os.getenv("HOURLY_CHECK_TIMEOUT", "600"))  # Extended timeout for hourly market check (seconds)
@@ -262,6 +262,11 @@ OPPORTUNITY_PCT = float(os.getenv("OPPORTUNITY_PCT", "2.0"))    # Trigger trade 
 RISK_VOLATILITY_THRESHOLD = float(os.getenv("RISK_VOLATILITY_THRESHOLD", "2.5"))  # % intraday swing to flag
 RISK_CORRELATION_THRESHOLD = float(os.getenv("RISK_CORRELATION_THRESHOLD", "0.85"))  # Correlation threshold for concentration warning
 RISK_MAX_DRAWDOWN_PCT = float(os.getenv("RISK_MAX_DRAWDOWN_PCT", "5.0"))  # Portfolio drawdown % to trigger alert
+
+# Crisis detection — macro event-driven defensive selling
+CRISIS_ALERT_PATH = os.path.join(DATA_DIR, "crisis_alert.json")
+CRISIS_COOLDOWN_HOURS = int(os.getenv("CRISIS_COOLDOWN_HOURS", "6"))  # Min hours between crisis reviews
+CRISIS_DEFENSIVE_TICKERS = ["XLU", "XLP", "TLT", "SHY", "GLD", "AGG", "BND"]  # Safe-haven instruments to keep
 
 # Rebalancer settings
 REBALANCER_TARGET_CASH_PCT = float(os.getenv("REBALANCER_TARGET_CASH_PCT", "20.0"))  # Target cash allocation %
