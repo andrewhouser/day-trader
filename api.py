@@ -266,12 +266,24 @@ def get_ticker_history(ticker: str, days: int = 30):
     interval_map = {1: "5m", 7: "15m", 30: "1d", 90: "1d", 180: "1d", 365: "1wk"}
     interval = interval_map.get(days, "1d")
 
-    end = datetime.now()
-    start = end - timedelta(days=days)
-
     try:
         t = yf.Ticker(ticker.upper())
-        hist = t.history(start=start.strftime("%Y-%m-%d"), end=end.strftime("%Y-%m-%d"), interval=interval)
+
+        # For 1D, use period-based fetch — start/end date strings exclude
+        # intraday data for the current session, and index symbols (^GSPC etc.)
+        # often return empty with start/end + 5m interval.
+        if days <= 1:
+            hist = t.history(period="1d", interval="5m")
+            if hist.empty:
+                # Fallback: 5 days at 15m gives a usable intraday-like view
+                hist = t.history(period="5d", interval="15m")
+        elif days <= 7:
+            hist = t.history(period="5d", interval="15m")
+        else:
+            end = datetime.now()
+            start = end - timedelta(days=days)
+            hist = t.history(start=start.strftime("%Y-%m-%d"), end=end.strftime("%Y-%m-%d"), interval=interval)
+
         if hist.empty:
             raise HTTPException(404, f"No data for {ticker}")
         results = []
@@ -1226,7 +1238,7 @@ class ChatRequest(BaseModel):
 @app.post("/api/chat")
 def chat(body: ChatRequest):
     """Chat with the trading agent about its decisions."""
-    from agent import call_ollama
+    from agent import call_ollama_direct
 
     message = body.message.strip()
     if not message:
@@ -1248,7 +1260,7 @@ User question: {message}"""
 
     model = CHAT_MODEL or config.RESEARCH_MODEL
     try:
-        response = call_ollama(prompt, system=CHAT_SYSTEM, model=model, timeout=CHAT_TIMEOUT)
+        response = call_ollama_direct(prompt, system=CHAT_SYSTEM, model=model, timeout=CHAT_TIMEOUT)
     except Exception as e:
         logger.error(f"Chat LLM call failed: {e}")
         raise HTTPException(502, f"LLM request failed: {e}")
@@ -1257,3 +1269,126 @@ User question: {message}"""
         raise HTTPException(502, response)
 
     return {"response": response}
+
+
+# ── Runtime Settings ───────────────────────────────────────
+
+_SETTINGS_PATH = os.path.join(config.DATA_DIR, "settings_overrides.json")
+
+# Map of setting key → (config attribute, type, min, max, description, group)
+_SETTINGS_SCHEMA = {
+    # Risk Management
+    "stop_loss_pct": ("STOP_LOSS_PCT", float, 0.5, 20.0, "Stop-loss trigger (%)", "Risk Management"),
+    "take_profit_partial_pct": ("TAKE_PROFIT_PARTIAL_PCT", float, 1.0, 50.0, "Partial take-profit at (%) gain", "Risk Management"),
+    "take_profit_full_pct": ("TAKE_PROFIT_FULL_PCT", float, 2.0, 100.0, "Full take-profit at (%) gain", "Risk Management"),
+    "risk_max_drawdown_pct": ("RISK_MAX_DRAWDOWN_PCT", float, 1.0, 25.0, "Portfolio drawdown alert (%)", "Risk Management"),
+    "risk_budget_pct": ("RISK_BUDGET_PCT", float, 0.5, 10.0, "Risk budget per trade (%)", "Risk Management"),
+    "crisis_cooldown_hours": ("CRISIS_COOLDOWN_HOURS", int, 1, 48, "Hours between crisis reviews", "Risk Management"),
+    "trailing_stop_atr_multiplier": ("TRAILING_STOP_ATR_MULTIPLIER", float, 0.5, 5.0, "Trailing stop ATR multiplier", "Risk Management"),
+    # Trading Aggressiveness
+    "score_buy_threshold": ("SCORE_BUY_THRESHOLD", int, 1, 8, "Buy threshold (composite score)", "Trading Aggressiveness"),
+    "score_sell_threshold": ("SCORE_SELL_THRESHOLD", int, -8, -1, "Sell threshold (composite score)", "Trading Aggressiveness"),
+    "high_cash_pct": ("HIGH_CASH_PCT", float, 30.0, 95.0, "Cash % to trigger aggressive buying", "Trading Aggressiveness"),
+    "temperature": ("TEMPERATURE", float, 0.0, 1.0, "LLM temperature (lower = conservative)", "Trading Aggressiveness"),
+    "speculation_max_position_pct": ("SPECULATION_MAX_POSITION_PCT", float, 0.01, 0.20, "Max speculative position (%)", "Trading Aggressiveness"),
+    "bear_case_threshold_pct": ("BEAR_CASE_THRESHOLD_PCT", float, 1.0, 25.0, "Bear-case debate trigger (%)", "Trading Aggressiveness"),
+    # Overseas Signals
+    "overseas_signal_threshold_pct": ("OVERSEAS_SIGNAL_THRESHOLD_PCT", float, 0.5, 10.0, "Overseas signal threshold (%)", "Overseas Signals"),
+    "overseas_signal_max_age_hours": ("OVERSEAS_SIGNAL_MAX_AGE_HOURS", int, 1, 48, "Overseas signal max age (hours)", "Overseas Signals"),
+    # Rebalancer
+    "rebalancer_target_cash_pct": ("REBALANCER_TARGET_CASH_PCT", float, 5.0, 80.0, "Target cash allocation (%)", "Rebalancer"),
+    "rebalancer_drift_threshold": ("REBALANCER_DRIFT_THRESHOLD", float, 2.0, 30.0, "Drift threshold before rebalance (%)", "Rebalancer"),
+}
+
+
+def _load_settings_overrides():
+    """Load saved settings overrides from disk and apply to config."""
+    try:
+        with open(_SETTINGS_PATH, "r") as f:
+            overrides = json.load(f)
+        applied = 0
+        for key, value in overrides.items():
+            if key in _SETTINGS_SCHEMA:
+                attr, typ, _, _, _, _ = _SETTINGS_SCHEMA[key]
+                setattr(config, attr, typ(value))
+                applied += 1
+        if applied:
+            logger.info(f"Loaded {applied} settings override(s) from disk")
+    except (FileNotFoundError, json.JSONDecodeError):
+        pass
+
+
+# Apply on startup
+_load_settings_overrides()
+
+
+@app.get("/api/settings")
+def get_settings():
+    """Return all tunable settings with current values, bounds, and metadata."""
+    groups: dict[str, list] = {}
+    for key, (attr, typ, min_val, max_val, desc, group) in _SETTINGS_SCHEMA.items():
+        current = getattr(config, attr)
+        entry = {
+            "key": key,
+            "value": current,
+            "type": "float" if typ is float else "int",
+            "min": min_val,
+            "max": max_val,
+            "description": desc,
+        }
+        groups.setdefault(group, []).append(entry)
+    return {"groups": groups}
+
+
+@app.put("/api/settings")
+def update_settings(body: dict):
+    """Update one or more runtime settings. Expects {"key": value, ...}.
+
+    Validates types and bounds, applies to config in memory, and persists to disk.
+    """
+    updates = body.get("settings", body)
+    if not isinstance(updates, dict):
+        raise HTTPException(400, "Expected a JSON object of settings")
+
+    errors = []
+    applied = {}
+
+    for key, value in updates.items():
+        if key not in _SETTINGS_SCHEMA:
+            errors.append(f"Unknown setting: {key}")
+            continue
+
+        attr, typ, min_val, max_val, desc, _ = _SETTINGS_SCHEMA[key]
+
+        try:
+            typed_value = typ(value)
+        except (ValueError, TypeError):
+            errors.append(f"{key}: expected {typ.__name__}, got {type(value).__name__}")
+            continue
+
+        if typed_value < min_val or typed_value > max_val:
+            errors.append(f"{key}: {typed_value} out of range [{min_val}, {max_val}]")
+            continue
+
+        setattr(config, attr, typed_value)
+        applied[key] = typed_value
+
+    # Persist all overrides to disk
+    if applied:
+        try:
+            existing = {}
+            try:
+                with open(_SETTINGS_PATH, "r") as f:
+                    existing = json.load(f)
+            except (FileNotFoundError, json.JSONDecodeError):
+                pass
+            existing.update(applied)
+            with open(_SETTINGS_PATH, "w") as f:
+                json.dump(existing, f, indent=2)
+        except Exception as e:
+            logger.error(f"Failed to persist settings: {e}")
+
+    result = {"applied": applied}
+    if errors:
+        result["errors"] = errors
+    return result

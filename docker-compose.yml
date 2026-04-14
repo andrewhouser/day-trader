@@ -24,14 +24,14 @@ services:
       - FTSE_OPEN_CRON=${FTSE_OPEN_CRON:-*/10 2-5 * * 0-4}
       - EUROPE_HANDOFF_CRON=${EUROPE_HANDOFF_CRON:-30 5 * * 0-4}
       # Core trading loop
-      - HOURLY_CRON=0,15,30,45 9-16 * * 0-4
+      - HOURLY_CRON=0,15,30,45 9-15 * * 0-4
       - MORNING_REPORT_CRON=0 7 * * 0-4
-      - RESEARCH_CRON=5,20,35,50 9-16 * * 0-4
+      - RESEARCH_CRON=5,20,35,50 9-15 * * 0-4
       - STOP_LOSS_PCT=3.0
       - OPPORTUNITY_PCT=2.0
       - COMPACTION_CRON=0 5 * * 0-4
       - SENTIMENT_CRON=0 8,12,16 * * 0-4
-      - RISK_MONITOR_CRON=*/3 9-16 * * 0-4
+      - RISK_MONITOR_CRON=*/3 9-15 * * 0-4
       - REBALANCER_CRON=0 6 * * 0
       - PERFORMANCE_CRON=0 6 * * 4
       - EVENTS_CRON=0 6 * * 0-4

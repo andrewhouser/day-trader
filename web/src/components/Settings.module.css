@@ -1,0 +1,125 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding-bottom: 2rem;
+}
+
+.grid {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+}
+
+.settingCard {
+  padding: 0.85rem 1rem;
+}
+
+.settingHeader {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+}
+
+.settingLabel {
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.resetButton {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 0.9rem;
+  padding: 0 0.25rem;
+}
+
+.resetButton:hover {
+  color: var(--blue);
+}
+
+.settingControl {
+  align-items: center;
+  display: flex;
+  gap: 0.75rem;
+}
+
+.slider {
+  -webkit-appearance: none;
+  appearance: none;
+  background: var(--border);
+  border-radius: 4px;
+  flex: 1;
+  height: 6px;
+  outline: none;
+}
+
+.slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  background: var(--blue);
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  height: 16px;
+  width: 16px;
+}
+
+.slider::-moz-range-thumb {
+  background: var(--blue);
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  height: 16px;
+  width: 16px;
+}
+
+.settingValue {
+  color: var(--text);
+  font-size: 0.95rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  min-width: 3rem;
+  text-align: right;
+}
+
+.settingValueDirty {
+  color: var(--yellow);
+}
+
+.settingRange {
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  margin-top: 0.25rem;
+}
+
+.saveBar {
+  align-items: center;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  display: flex;
+  gap: 1rem;
+  padding: 0.75rem 1rem;
+  position: sticky;
+  bottom: 1rem;
+}
+
+.dirtyHint {
+  color: var(--yellow);
+  font-size: 0.8rem;
+}
+
+.msgSuccess {
+  color: var(--green);
+  font-size: 0.85rem;
+  padding: 0.75rem;
+}
+
+.msgError {
+  color: var(--red);
+  font-size: 0.85rem;
+  padding: 0.75rem;
+}

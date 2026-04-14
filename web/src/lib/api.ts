@@ -213,6 +213,19 @@ export interface OverseasSignalsResult {
   total: number;
 }
 
+export interface SettingEntry {
+  key: string;
+  value: number;
+  type: "float" | "int";
+  min: number;
+  max: number;
+  description: string;
+}
+
+export interface SettingsResponse {
+  groups: Record<string, SettingEntry[]>;
+}
+
 export const api = {
   getPortfolio: () => fetchJson<Portfolio>("/portfolio"),
   getPortfolioHistory: (days = 30) =>
@@ -275,4 +288,9 @@ export const api = {
     fetchJson<{ raw: string }[]>(`/overseas/handoff?limit=${limit}`),
   getOverseasSignals: () =>
     fetchJson<OverseasSignalsResult>("/overseas/signals"),
+  // Settings
+  getSettings: () =>
+    fetchJson<SettingsResponse>("/settings"),
+  updateSettings: (settings: Record<string, number>) =>
+    putJson<{ applied: Record<string, number>; errors?: string[] }>("/settings", { settings }),
 };

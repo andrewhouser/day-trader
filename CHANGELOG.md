@@ -1,5 +1,23 @@
 # Changelog
 
+## 2026-04-14
+
+### Added
+- **Runtime settings panel** (`/settings`) — new dashboard page with slider controls for 18 tunable parameters across 4 groups: Risk Management (stop-loss, take-profit, drawdown, risk budget, crisis cooldown, trailing stop ATR), Trading Aggressiveness (buy/sell thresholds, cash deployment trigger, LLM temperature, speculation cap, bear-case trigger), Overseas Signals (threshold, max age), and Rebalancer (target cash, drift threshold). Changes apply immediately to the running agent and persist to `settings_overrides.json` across restarts. New API endpoints: `GET /api/settings`, `PUT /api/settings`.
+- **Two-tier navigation** — nav bar restructured from a flat list of 17 links into 5 top-level group tabs (Overview, Trading, Analysis, History, System) with sub-tabs for each group's pages. Reduces visual clutter while keeping all pages one click away.
+- **Market hours trade guard** — `validate_trade()` now checks the current ET time against U.S. equity market hours (9:30 AM–4:00 PM Mon–Fri) before allowing any trade. Rejects with a clear message like `"Market closed (current time 16:01 ET, hours 9:30–16:00)"`. Catches edge cases where a cycle starts before close but the LLM responds after.
+- **Chat lock bypass** — new `call_ollama_direct()` function in `agent.py` sends LLM requests without acquiring the global `_ollama_lock`. The chat endpoint now uses this so user queries don't block behind scheduled agent tasks that can hold the lock for minutes.
+- **Chat Node.js route handler** — `/api/chat` is now served by a dedicated Next.js App Router handler (`web/src/app/api/chat/route.ts`) running in Node.js runtime with a 10-minute timeout, bypassing the Edge middleware whose `undici` fetch has a non-configurable headers timeout that was causing 500 errors.
+
+### Changed
+- **Market-hours cron schedules** — trader (`HOURLY_CRON`), research (`RESEARCH_CRON`), and risk monitor (`RISK_MONITOR_CRON`) changed from `9-16` to `9-15` in `config.py`, `.env`, and `docker-compose.yml`. Last scheduled fires are now 15:45 (trader), 15:50 (research), 15:57 (risk monitor) — all before the 4 PM close.
+- **Sentiment cron** kept at 4 PM (analysis-only, no trades).
+- **Middleware matcher** narrowed to exclude `/api/chat` so the route handler takes priority.
+
+### Fixed
+- **Chat 500 errors** — the Edge middleware's `fetch` to the backend timed out after ~30s (`UND_ERR_HEADERS_TIMEOUT`) because the chat endpoint blocked on `_ollama_lock` waiting for running agent tasks. Fixed by both bypassing the lock (backend) and using a Node.js route handler with proper timeout (frontend).
+- **Index tracker 1D chart 500** — `get_ticker_history` used `start`/`end` date strings with `interval="5m"` which returned empty data for index symbols (`^GSPC`, `^DJI`, etc.). Now uses `period="1d"` for 1D requests and falls back to `period="5d"` with `interval="15m"` if empty. Also fixed 7D range to use `period="5d"`.
+
 ## 2026-04-13
 
 ### Added

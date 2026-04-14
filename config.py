@@ -24,11 +24,11 @@ REPORT_TIMEOUT = int(os.getenv("REPORT_TIMEOUT", "600"))  # Extended timeout for
 # use the APScheduler convention.
 #
 # U.S. market hours: 9:30 AM – 4:00 PM ET, Mon–Fri
-HOURLY_CRON = os.getenv("HOURLY_CRON", "0,30 9-16 * * 0-4")  # Every 30 min 9 AM–4 PM, Mon–Fri
+HOURLY_CRON = os.getenv("HOURLY_CRON", "0,30 9-15 * * 0-4")  # Every 30 min 9 AM–3:30 PM, Mon–Fri
 MORNING_REPORT_CRON = os.getenv("MORNING_REPORT_CRON", "0 7 * * 0-4")  # 7:00 AM weekdays
-RESEARCH_CRON = os.getenv("RESEARCH_CRON", "5/10 9-16 * * 0-4")  # Every 10 min offset by 5 (:05,:15,:25,...) during market hours, Mon–Fri
+RESEARCH_CRON = os.getenv("RESEARCH_CRON", "5/10 9-15 * * 0-4")  # Every 10 min offset by 5 (:05,:15,:25,...) during market hours, Mon–Fri
 SENTIMENT_CRON = os.getenv("SENTIMENT_CRON", "0 8,12,16 * * 0-4")  # 8 AM, 12 PM, 4 PM weekdays
-RISK_MONITOR_CRON = os.getenv("RISK_MONITOR_CRON", "*/3 9-16 * * 0-4")  # Every 3 min during market hours
+RISK_MONITOR_CRON = os.getenv("RISK_MONITOR_CRON", "*/3 9-15 * * 0-4")  # Every 3 min during market hours
 REBALANCER_CRON = os.getenv("REBALANCER_CRON", "0 6 * * 0")  # 6 AM every Monday
 PERFORMANCE_CRON = os.getenv("PERFORMANCE_CRON", "0 6 * * 4")  # 6 AM every Friday
 EVENTS_CRON = os.getenv("EVENTS_CRON", "0 6 * * 0-4")  # 6 AM weekdays

@@ -94,6 +94,37 @@ def call_ollama(
         return f"[ERROR] Could not reach Ollama: {e}"
 
 
+def call_ollama_direct(
+    prompt: str,
+    system: str = "",
+    model: str | None = None,
+    timeout: int | None = None,
+) -> str:
+    """Send a prompt to Ollama WITHOUT acquiring the global lock.
+
+    Use for interactive queries (chat) that should not block behind
+    scheduled agent tasks. Ollama handles concurrent requests via its
+    own internal queue, so this is safe — it just means the GPU may
+    be shared briefly.
+    """
+    url = f"{config.OLLAMA_BASE_URL}/api/generate"
+    resolved_model = model or config.RESEARCH_MODEL
+    payload = {
+        "model": resolved_model,
+        "prompt": prompt,
+        "system": system,
+        "stream": False,
+        "options": {"temperature": config.TEMPERATURE},
+    }
+    try:
+        resp = requests.post(url, json=payload, timeout=timeout if timeout is not None else config.OLLAMA_TIMEOUT)
+        resp.raise_for_status()
+        return resp.json().get("response", "")
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Ollama direct request failed: {e}")
+        return f"[ERROR] Could not reach Ollama: {e}"
+
+
 def load_portfolio() -> dict:
     """Load portfolio state from disk, returning a default if missing."""
     try:
@@ -189,6 +220,18 @@ def parse_trades_from_response(response: str, portfolio: dict) -> list[dict]:
 
 def validate_trade(trade: dict, portfolio: dict) -> tuple[bool, str]:
     """Validate a trade against risk rules.  Supports fractional shares."""
+    # ── Market hours guard ─────────────────────────────────
+    # U.S. equity markets: 9:30 AM – 4:00 PM ET, Mon–Fri
+    from zoneinfo import ZoneInfo
+    now_et = datetime.now(ZoneInfo(config.TIMEZONE))
+    weekday = now_et.weekday()  # 0=Mon, 6=Sun
+    market_open = now_et.replace(hour=9, minute=30, second=0, microsecond=0)
+    market_close = now_et.replace(hour=16, minute=0, second=0, microsecond=0)
+    if weekday > 4:  # Saturday or Sunday
+        return False, "Market closed (weekend)"
+    if now_et < market_open or now_et >= market_close:
+        return False, f"Market closed (current time {now_et.strftime('%H:%M')} ET, hours 9:30–16:00)"
+
     action = trade.get("action", "").upper()
     ticker = trade.get("ticker", "")
     quantity = trade.get("quantity", 0)

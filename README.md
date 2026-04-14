@@ -58,7 +58,7 @@ The project is split into two services that run together via Docker Compose:
 ┌──────────────────────────┼───────────────────────────────────────┐
 │  web (Next.js)           │                                       │
 │  ┌───────────────────────┴─────────────────────────────────┐     │
-│  │  Dashboard UI :3000  (15 pages + Learn)                 │     │
+│  │  Dashboard UI :3000  (16 pages + Learn)                 │     │
 │  │  Proxies /api/* → trader:8000                           │     │
 │  └─────────────────────────────────────────────────────────┘     │
 └──────────────────────────────────────────────────────────────────┘
@@ -96,8 +96,8 @@ The system runs nineteen scheduled agents organized into four categories:
 
 | Agent | Schedule | Model | Description |
 |-------|----------|-------|-------------|
-| Market Research | Every 15 min (9 AM–4 PM) | `qwen3.5:latest` | Gathers data from 7 sources (FRED, Finnhub, SEC EDGAR, Alpha Vantage, Finviz, Reuters, Investing.com), produces structured research notes, checks stop-loss/opportunity alerts. Triggers the trader if alerts fire. |
-| Market Check | Every 15 min (9 AM–4 PM) | `deepseek-r1:14b` | Full trading cycle — reads research, sentiment, risk alerts, events, technicals, regime, overseas signals, playbook, intraday reversals, momentum pulse, and scoring framework. Scores instruments with dynamic buy threshold (reduced when cash is high), runs bear-case debate on large trades, executes trades, writes reflections. Staggered 5 minutes after research to avoid GPU contention. |
+| Market Research | Every 15 min (9 AM–3:50 PM) | `qwen3.5:latest` | Gathers data from 7 sources (FRED, Finnhub, SEC EDGAR, Alpha Vantage, Finviz, Reuters, Investing.com), produces structured research notes, checks stop-loss/opportunity alerts. Triggers the trader if alerts fire. |
+| Market Check | Every 15 min (9 AM–3:45 PM) | `deepseek-r1:14b` | Full trading cycle — reads research, sentiment, risk alerts, events, technicals, regime, overseas signals, playbook, intraday reversals, momentum pulse, and scoring framework. Scores instruments with dynamic buy threshold (reduced when cash is high), runs bear-case debate on large trades, executes trades, writes reflections. Staggered 5 minutes after research to avoid GPU contention. |
 | Morning Report | 7:00 AM weekdays | `llama3.2` | Daily summary with portfolio state, overnight global recap (Asia + Europe), trades, performance, and outlook. |
 
 ### Intelligence Agents
@@ -115,7 +115,7 @@ The system runs nineteen scheduled agents organized into four categories:
 
 | Agent | Schedule | Model | Description |
 |-------|----------|-------|-------------|
-| Risk Monitor | Every 3 min (9 AM–4 PM) | None (rule-based) | Watches for trailing stop breaches, take-profit targets, portfolio drawdown, volatility spikes, position correlation, and crisis alerts. Automatically executes stops, take-profits, and crisis defensive sells. Recalculates portfolio total value from current market prices every cycle. |
+| Risk Monitor | Every 3 min (9 AM–3:57 PM) | None (rule-based) | Watches for trailing stop breaches, take-profit targets, portfolio drawdown, volatility spikes, position correlation, and crisis alerts. Automatically executes stops, take-profits, and crisis defensive sells. Recalculates portfolio total value from current market prices every cycle. All trades validated against market hours (9:30 AM–4 PM ET). |
 | Portfolio Rebalancer | 6:00 AM Mondays | `qwen3.5:latest` | Analyzes allocation drift, concentration risk, and cash drag. Suggests and executes rebalancing trades. |
 | Expansion Analysis | 7:00 AM Wednesdays | `qwen3.5:latest` | Evaluates potential new instruments for portfolio diversification. Proposals require user approval before trading. |
 | Performance Analyst | 6:00 AM Fridays | `qwen3.5:latest` | Computes win rate, profit factor, per-instrument breakdown, max drawdown, holding period analysis, and pattern detection. Updates adaptive score weights. |
@@ -252,6 +252,7 @@ Regime detection uses: SPY price vs SMA 50/200, golden/death cross, RSI, VIX lev
 ## Risk Management
 
 ### Rule-Based Controls
+- Market hours enforcement: all trades validated against 9:30 AM–4:00 PM ET Mon–Fri before execution; trades outside market hours are rejected
 - Regime-adjusted max position size (25% in uptrends, 10–15% in downtrends/volatility)
 - Fractional shares supported — positions are sized by dollar amount, not whole shares, so percentage-based limits work correctly at any portfolio size
 - Configurable stop-loss threshold (default: 3% drop from entry)
@@ -411,6 +412,7 @@ All persistent state lives in the `trader/` directory, which is volume-mounted f
 | `strategy_scores.json` | Per-strategy win/loss tracking and suspension status |
 | `speculation.md` | Speculative opportunity theses from the speculation agent |
 | `momentum_pulse.json` | Latest intraday momentum pulse scan results (reversal signals) |
+| `settings_overrides.json` | Runtime settings overrides from the dashboard Settings page |
 | `crisis_alert.json` | Active crisis alert from headline scanner (consumed by risk monitor) |
 | `expansion_proposals.json` | Pending/approved/rejected expansion proposals |
 | `approved_instruments.json` | User-approved instruments beyond the core set |
@@ -502,8 +504,8 @@ environment:
   - FTSE_OPEN_CRON=*/10 2-5 * * 0-4
   - EUROPE_HANDOFF_CRON=30 5 * * 0-4
   # Core trading loop
-  - HOURLY_CRON=0,15,30,45 9-16 * * 0-4
-  - RESEARCH_CRON=5,20,35,50 9-16 * * 0-4
+  - HOURLY_CRON=0,15,30,45 9-15 * * 0-4
+  - RESEARCH_CRON=5,20,35,50 9-15 * * 0-4
   - MORNING_REPORT_CRON=0 7 * * 0-4
   # Intelligence agents
   - SENTIMENT_CRON=0 8,12,16 * * 0-4
@@ -511,7 +513,7 @@ environment:
   - MARKET_CONTEXT_CRON=55 6 * * 0-4
   - PLAYBOOK_CRON=30 6 * * 4
   # Risk & portfolio
-  - RISK_MONITOR_CRON=*/3 9-16 * * 0-4
+  - RISK_MONITOR_CRON=*/3 9-15 * * 0-4
   - REBALANCER_CRON=0 6 * * 0
   # Analytics & maintenance
   - PERFORMANCE_CRON=0 6 * * 4

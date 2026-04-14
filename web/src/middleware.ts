@@ -13,7 +13,6 @@ export async function middleware(request: NextRequest) {
   // For POST/PUT/DELETE, proxy explicitly to preserve the request body
   const headers: Record<string, string> = {};
   request.headers.forEach((value, key) => {
-    // Skip host/connection headers that shouldn't be forwarded
     if (!["host", "connection"].includes(key.toLowerCase())) {
       headers[key] = value;
     }
@@ -21,19 +20,27 @@ export async function middleware(request: NextRequest) {
 
   const body = await request.text();
 
-  const upstream = await fetch(destination, {
-    method: request.method,
-    headers,
-    body: body || undefined,
-  });
+  try {
+    const upstream = await fetch(destination, {
+      method: request.method,
+      headers,
+      body: body || undefined,
+    });
 
-  return new NextResponse(upstream.body, {
-    status: upstream.status,
-    statusText: upstream.statusText,
-    headers: Object.fromEntries(upstream.headers.entries()),
-  });
+    return new NextResponse(upstream.body, {
+      status: upstream.status,
+      statusText: upstream.statusText,
+      headers: Object.fromEntries(upstream.headers.entries()),
+    });
+  } catch (err) {
+    return NextResponse.json(
+      { detail: `Backend proxy error: ${err instanceof Error ? err.message : "unknown"}` },
+      { status: 502 },
+    );
+  }
 }
 
 export const config = {
-  matcher: "/api/:path*",
+  // Match all /api/* EXCEPT /api/chat which has its own Node.js route handler
+  matcher: "/api/((?!chat).*)",
 };

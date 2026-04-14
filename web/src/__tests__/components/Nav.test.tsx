@@ -23,13 +23,11 @@ describe("Nav", () => {
     expect(screen.getByText("System")).toBeInTheDocument();
   });
 
-  it("renders navigation links", () => {
+  it("renders navigation links for the active group", () => {
     render(<Nav />);
+    // Default pathname is "/" which is in Overview group
     expect(screen.getByText("Dashboard")).toBeInTheDocument();
-    expect(screen.getByText("Trades")).toBeInTheDocument();
-    expect(screen.getByText("Technicals")).toBeInTheDocument();
-    expect(screen.getByText("Tasks")).toBeInTheDocument();
-    expect(screen.getByText("Chat")).toBeInTheDocument();
+    expect(screen.getByText("Learn")).toBeInTheDocument();
   });
 
   it("marks the active link based on pathname", () => {
@@ -39,6 +37,9 @@ describe("Nav", () => {
     render(<Nav />);
     const tradesLink = screen.getByRole("tab", { name: "Trades" });
     expect(tradesLink).toHaveAttribute("aria-selected", "true");
+    // Trading group should also be active
+    const tradingGroup = screen.getByRole("tab", { name: "Trading" });
+    expect(tradingGroup).toHaveAttribute("aria-selected", "true");
   });
 
   it("has main navigation role", () => {

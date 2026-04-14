@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -24,7 +24,6 @@ const TAB_GROUPS: TabGroup[] = [
     label: "Overview",
     tabs: [
       { href: "/", label: "Dashboard" },
-      { href: "/learn", label: "Learn" },
     ],
   },
   {
@@ -57,15 +56,33 @@ const TAB_GROUPS: TabGroup[] = [
   {
     label: "System",
     tabs: [
-      { href: "/chat", label: "Chat" },
       { href: "/tasks", label: "Tasks" },
+      { href: "/settings", label: "Settings" },
+      { href: "/chat", label: "Chat" },
+      { href: "/learn", label: "Learn" },
     ],
   },
 ];
 
+function findActiveGroup(pathname: string): string {
+  for (const group of TAB_GROUPS) {
+    for (const tab of group.tabs) {
+      if (tab.href === pathname) return group.label;
+    }
+  }
+  return TAB_GROUPS[0].label;
+}
+
 export function Nav() {
   const pathname = usePathname();
   const [pendingCount, setPendingCount] = useState(0);
+
+  const activeGroupLabel = useMemo(() => findActiveGroup(pathname), [pathname]);
+
+  const activeGroup = useMemo(
+    () => TAB_GROUPS.find((g) => g.label === activeGroupLabel) ?? TAB_GROUPS[0],
+    [activeGroupLabel],
+  );
 
   useEffect(() => {
     let mounted = true;
@@ -87,39 +104,47 @@ export function Nav() {
 
   return (
     <nav aria-label="Main navigation" className={styles.nav} role="navigation">
-      {TAB_GROUPS.map((group) => (
-        <div
-          aria-label={group.label}
-          className={styles.navGroup}
-          key={group.label}
-          role="tablist"
-        >
-          <span className={styles.navGroupLabel}>{group.label}</span>
-          <div className={styles.navGroupTabs}>
-            {group.tabs.map((t) => (
-              <Link
-                aria-selected={pathname === t.href}
-                className={
-                  pathname === t.href
-                    ? `${styles.navLink} ${styles.navLinkActive}`
-                    : styles.navLink
-                }
-                href={t.href}
-                key={t.href}
-                role="tab"
-              >
-                {t.label}
-                {t.href === "/expansion" && pendingCount > 0 && (
-                  <span
-                    aria-label={`${pendingCount} pending proposals`}
-                    className={styles.pendingDot}
-                  />
-                )}
-              </Link>
-            ))}
-          </div>
-        </div>
-      ))}
+      <div className={styles.primaryBar} role="tablist">
+        {TAB_GROUPS.map((group) => (
+          <Link
+            aria-selected={group.label === activeGroupLabel}
+            className={
+              group.label === activeGroupLabel
+                ? `${styles.primaryTab} ${styles.primaryTabActive}`
+                : styles.primaryTab
+            }
+            href={group.tabs[0].href}
+            key={group.label}
+            role="tab"
+          >
+            {group.label}
+          </Link>
+        ))}
+      </div>
+
+      <div className={styles.secondaryBar} role="tablist">
+        {activeGroup.tabs.map((t) => (
+          <Link
+            aria-selected={pathname === t.href}
+            className={
+              pathname === t.href
+                ? `${styles.secondaryTab} ${styles.secondaryTabActive}`
+                : styles.secondaryTab
+            }
+            href={t.href}
+            key={t.href}
+            role="tab"
+          >
+            {t.label}
+            {t.href === "/expansion" && pendingCount > 0 && (
+              <span
+                aria-label={`${pendingCount} pending proposals`}
+                className={styles.pendingDot}
+              />
+            )}
+          </Link>
+        ))}
+      </div>
     </nav>
   );
 }
