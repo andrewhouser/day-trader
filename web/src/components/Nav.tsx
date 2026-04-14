@@ -19,13 +19,11 @@ interface TabGroup {
   tabs: Tab[];
 }
 
+const STANDALONE_TABS: Tab[] = [
+  { href: "/", label: "Dashboard" },
+];
+
 const TAB_GROUPS: TabGroup[] = [
-  {
-    label: "Overview",
-    tabs: [
-      { href: "/", label: "Dashboard" },
-    ],
-  },
   {
     label: "Trading",
     tabs: [
@@ -64,13 +62,13 @@ const TAB_GROUPS: TabGroup[] = [
   },
 ];
 
-function findActiveGroup(pathname: string): string {
+function findActiveGroup(pathname: string): string | null {
   for (const group of TAB_GROUPS) {
     for (const tab of group.tabs) {
       if (tab.href === pathname) return group.label;
     }
   }
-  return TAB_GROUPS[0].label;
+  return null;
 }
 
 export function Nav() {
@@ -80,7 +78,7 @@ export function Nav() {
   const activeGroupLabel = useMemo(() => findActiveGroup(pathname), [pathname]);
 
   const activeGroup = useMemo(
-    () => TAB_GROUPS.find((g) => g.label === activeGroupLabel) ?? TAB_GROUPS[0],
+    () => TAB_GROUPS.find((g) => g.label === activeGroupLabel) ?? null,
     [activeGroupLabel],
   );
 
@@ -104,46 +102,70 @@ export function Nav() {
 
   return (
     <nav aria-label="Main navigation" className={styles.nav} role="navigation">
-      <div className={styles.primaryBar} role="tablist">
-        {TAB_GROUPS.map((group) => (
-          <Link
-            aria-selected={group.label === activeGroupLabel}
-            className={
-              group.label === activeGroupLabel
-                ? `${styles.primaryTab} ${styles.primaryTabActive}`
-                : styles.primaryTab
-            }
-            href={group.tabs[0].href}
-            key={group.label}
-            role="tab"
-          >
-            {group.label}
-          </Link>
-        ))}
-      </div>
-
-      <div className={styles.secondaryBar} role="tablist">
-        {activeGroup.tabs.map((t) => (
+      <div className={styles.bar}>
+        {/* Standalone tabs (no sub-menu) */}
+        {STANDALONE_TABS.map((t) => (
           <Link
             aria-selected={pathname === t.href}
             className={
               pathname === t.href
-                ? `${styles.secondaryTab} ${styles.secondaryTabActive}`
-                : styles.secondaryTab
+                ? `${styles.tab} ${styles.tabActive}`
+                : styles.tab
             }
             href={t.href}
             key={t.href}
             role="tab"
           >
             {t.label}
-            {t.href === "/expansion" && pendingCount > 0 && (
-              <span
-                aria-label={`${pendingCount} pending proposals`}
-                className={styles.pendingDot}
-              />
-            )}
           </Link>
         ))}
+
+        {/* Group tabs with inline sub-tabs */}
+        {TAB_GROUPS.map((group) => {
+          const isActive = group.label === activeGroupLabel;
+          return (
+            <div className={styles.groupWrapper} key={group.label}>
+              <Link
+                aria-selected={isActive}
+                className={
+                  isActive
+                    ? `${styles.tab} ${styles.tabActive}`
+                    : styles.tab
+                }
+                href={group.tabs[0].href}
+                role="tab"
+              >
+                {group.label}
+              </Link>
+
+              {isActive && activeGroup && (
+                <div className={styles.subtabs}>
+                  {activeGroup.tabs.map((t) => (
+                    <Link
+                      aria-selected={pathname === t.href}
+                      className={
+                        pathname === t.href
+                          ? `${styles.subtab} ${styles.subtabActive}`
+                          : styles.subtab
+                      }
+                      href={t.href}
+                      key={t.href}
+                      role="tab"
+                    >
+                      {t.label}
+                      {t.href === "/expansion" && pendingCount > 0 && (
+                        <span
+                          aria-label={`${pendingCount} pending proposals`}
+                          className={styles.pendingDot}
+                        />
+                      )}
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
     </nav>
   );

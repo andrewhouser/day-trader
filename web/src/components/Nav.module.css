@@ -1,63 +1,74 @@
 .nav {
-  display: flex;
-  flex-direction: column;
+  border-bottom: 1px solid var(--border);
   margin-bottom: 1.5rem;
 }
 
-/* ── Primary group tabs ─────────────────────────────────── */
-
-.primaryBar {
-  border-bottom: 1px solid var(--border);
+.bar {
+  align-items: stretch;
   display: flex;
-  gap: 0;
 }
 
-.primaryTab {
+/* ── Group wrapper: holds a primary tab + its inline subtabs ── */
+
+.groupWrapper {
+  align-items: stretch;
+  display: flex;
+}
+
+/* ── Primary tabs (Dashboard, Learn, Trading, Analysis, etc.) ── */
+
+.tab {
+  align-items: center;
   border-bottom: 2px solid transparent;
   color: var(--text-muted);
+  display: flex;
   font-size: 0.8rem;
   font-weight: 600;
   letter-spacing: 0.03em;
-  padding: 0.6rem 1.1rem;
+  padding: 0.6rem 1rem;
   text-transform: uppercase;
-  transition: all 0.15s;
+  transition: color 0.15s;
   white-space: nowrap;
 }
 
-.primaryTab:hover {
+.tab:hover {
   color: var(--text);
   text-decoration: none;
 }
 
-.primaryTabActive {
+.tabActive {
   border-bottom-color: var(--blue);
   color: var(--text);
 }
 
-/* ── Secondary page tabs ────────────────────────────────── */
+/* ── Inline sub-tabs (appear right of the active group tab) ── */
 
-.secondaryBar {
-  border-bottom: 1px solid var(--border);
+.subtabs {
+  align-items: stretch;
+  background: rgba(255, 255, 255, 0.03);
+  border-left: 1px solid var(--border);
+  border-right: 1px solid var(--border);
   display: flex;
-  gap: 0;
 }
 
-.secondaryTab {
+.subtab {
+  align-items: center;
   border-bottom: 2px solid transparent;
   color: var(--text-muted);
-  font-size: 0.85rem;
+  display: flex;
+  font-size: 0.8rem;
   font-weight: 500;
-  padding: 0.5rem 1rem;
-  transition: all 0.15s;
+  padding: 0.6rem 0.85rem;
+  transition: color 0.15s;
   white-space: nowrap;
 }
 
-.secondaryTab:hover {
+.subtab:hover {
   color: var(--text);
   text-decoration: none;
 }
 
-.secondaryTabActive {
+.subtabActive {
   border-bottom-color: var(--blue);
   color: var(--blue);
 }
@@ -77,21 +88,18 @@
 /* ── Responsive ─────────────────────────────────────────── */
 
 @media (max-width: 900px) {
-  .primaryBar {
+  .bar {
+    flex-wrap: wrap;
     overflow-x: auto;
   }
 
-  .secondaryBar {
-    overflow-x: auto;
-  }
-
-  .primaryTab {
+  .tab {
     font-size: 0.75rem;
-    padding: 0.5rem 0.75rem;
+    padding: 0.5rem 0.7rem;
   }
 
-  .secondaryTab {
-    font-size: 0.8rem;
-    padding: 0.45rem 0.75rem;
+  .subtab {
+    font-size: 0.75rem;
+    padding: 0.5rem 0.6rem;
   }
 }

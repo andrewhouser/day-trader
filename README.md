@@ -79,6 +79,62 @@ The project is split into two services that run together via Docker Compose:
 - **Styling:** Custom CSS (dark theme, no external UI library)
 - **Rendering:** Client-side components with auto-refresh polling
 
+## Project Structure
+
+```
+├── api.py                  # FastAPI REST API (main application)
+├── server.py               # Uvicorn entry point
+├── scheduler.py            # APScheduler background job runner
+├── config.py               # Shared configuration and constants
+├── entrypoint.sh           # Docker entry point
+├── Dockerfile
+├── docker-compose.yml
+├── requirements.txt
+├── pyproject.toml
+│
+├── agents/                 # LLM-powered agent modules
+│   ├── agent.py            # Core trading agent (hourly check, research, morning report)
+│   ├── compactor.py        # Memory compaction (research, trade log, reflections)
+│   ├── events_agent.py     # Economic events calendar
+│   ├── expansion.py        # Portfolio expansion proposals
+│   ├── market_context.py   # Rolling 30-day market context
+│   ├── overseas_monitors.py# Nikkei and FTSE market monitors
+│   ├── performance_analyst.py # Weekly performance analysis
+│   ├── playbook_agent.py   # Strategy playbook curator
+│   ├── rebalancer.py       # Portfolio rebalancing
+│   ├── risk_monitor.py     # Risk monitoring and auto-stops
+│   ├── sentiment_agent.py  # News sentiment analysis
+│   └── speculation_agent.py# Asymmetric opportunity finder
+│
+├── core/                   # Pure library modules (no LLM calls)
+│   ├── benchmark.py        # Portfolio vs SPY benchmark comparison
+│   ├── exchange_calendar.py# Exchange holidays and DST utilities
+│   ├── market_data.py      # Market data fetching (yfinance, Finnhub)
+│   ├── overseas_signals.py # Overseas trade signal queue
+│   ├── position_sizing.py  # Volatility-scaled position sizing
+│   ├── regime.py           # Market regime detection
+│   ├── score_weights.py    # Adaptive score dimension weights
+│   ├── strategy_tracker.py # Per-strategy win/loss tracking
+│   └── stress_test.py      # Portfolio stress test scenarios
+│
+├── research/               # Multi-source research pipeline
+│   ├── adapters/           # Data source adapters (FRED, Finnhub, SEC, etc.)
+│   ├── pipeline.py         # Research pipeline orchestrator
+│   ├── summarizer.py       # LLM-based research summarization
+│   └── ...
+│
+├── trader/                 # Persistent data (volume-mounted)
+│   ├── portfolio.json
+│   ├── trade_log.md
+│   ├── reports/
+│   └── ...
+│
+├── web/                    # Next.js dashboard frontend
+│   └── src/
+│
+└── tests/                  # Python test suite
+```
+
 ## Agents
 
 The system runs nineteen scheduled agents organized into four categories:

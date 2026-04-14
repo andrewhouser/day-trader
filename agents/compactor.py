@@ -14,7 +14,7 @@ import re
 from datetime import datetime, timedelta
 
 import config
-from agent import append_to_file, call_ollama
+from agents.agent import append_to_file, call_ollama
 
 logger = logging.getLogger(__name__)
 

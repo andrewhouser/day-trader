@@ -107,7 +107,7 @@ def compute_benchmark_comparison() -> dict:
       - trading_days
       - suggestions: list of concrete parameter adjustment strings
     """
-    from agent import load_portfolio
+    from agents.agent import load_portfolio
 
     portfolio = load_portfolio()
     history = _load_portfolio_history()

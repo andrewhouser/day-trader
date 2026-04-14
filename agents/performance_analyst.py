@@ -6,7 +6,7 @@ import re
 from datetime import datetime
 
 import config
-from agent import append_to_file, call_ollama, load_portfolio, read_recent_entries
+from agents.agent import append_to_file, call_ollama, load_portfolio, read_recent_entries
 
 logger = logging.getLogger(__name__)
 
@@ -341,7 +341,7 @@ Be quantitative. Use the actual numbers. Don't be vague."""
 
     # Update adaptive score weights from closed trades with entry_scores
     try:
-        from score_weights import update_weights_from_outcome
+        from core.score_weights import update_weights_from_outcome
         weight_updates = 0
         for t in trades:
             if t.get("action") != "SELL" or "realized_pnl" not in t:

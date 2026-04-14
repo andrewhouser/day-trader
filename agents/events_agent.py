@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 import yfinance as yf
 
 import config
-from agent import call_ollama
+from agents.agent import call_ollama
 
 logger = logging.getLogger(__name__)
 

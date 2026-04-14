@@ -5,7 +5,7 @@ import logging
 from datetime import datetime
 
 import config
-from agent import (
+from agents.agent import (
     append_to_file,
     call_ollama,
     execute_trade,
@@ -13,7 +13,7 @@ from agent import (
     read_recent_entries,
     validate_trade,
 )
-from market_data import fetch_instrument_prices
+from core.market_data import fetch_instrument_prices
 
 logger = logging.getLogger(__name__)
 
@@ -133,7 +133,7 @@ End with a brief allocation summary table."""
     timestamp = now.strftime("%Y-%m-%d %H:%M:%S")
 
     # Parse and execute any rebalancing trades
-    from agent import parse_trades_from_response
+    from agents.agent import parse_trades_from_response
     trades = parse_trades_from_response(response, portfolio)
     executed = []
 

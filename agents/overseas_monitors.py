@@ -24,14 +24,14 @@ from datetime import datetime
 import yfinance as yf
 
 import config
-from agent import append_to_file, call_ollama, read_recent_entries
-from market_data import fetch_index_levels, fetch_instrument_prices
-from exchange_calendar import (
+from agents.agent import append_to_file, call_ollama, read_recent_entries
+from core.market_data import fetch_index_levels, fetch_instrument_prices
+from core.exchange_calendar import (
     is_exchange_open,
     get_schedule_drift_warning,
     TZ_ET,
 )
-from overseas_signals import emit_signal, get_pending_signals, format_signals_for_prompt
+from core.overseas_signals import emit_signal, get_pending_signals, format_signals_for_prompt
 
 logger = logging.getLogger(__name__)
 

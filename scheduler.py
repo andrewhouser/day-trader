@@ -14,19 +14,19 @@ from apscheduler.schedulers.blocking import BlockingScheduler
 from apscheduler.triggers.cron import CronTrigger
 
 import config
-from agent import run_hourly_check, run_morning_report, run_research
-from compactor import run_compaction
-from sentiment_agent import run_sentiment
-from risk_monitor import run_risk_monitor
-from rebalancer import run_rebalancer
-from performance_analyst import run_performance_analysis
-from events_agent import run_events_calendar
-from expansion import run_expansion_analysis, load_approved_into_config
-from overseas_monitors import run_nikkei_open, run_nikkei_reopen, run_ftse_open, run_europe_handoff
-from playbook_agent import run_playbook_update
-from market_context import update_market_context
-from speculation_agent import run_speculation
-from market_data import run_momentum_pulse
+from agents.agent import run_hourly_check, run_morning_report, run_research
+from agents.compactor import run_compaction
+from agents.sentiment_agent import run_sentiment
+from agents.risk_monitor import run_risk_monitor
+from agents.rebalancer import run_rebalancer
+from agents.performance_analyst import run_performance_analysis
+from agents.events_agent import run_events_calendar
+from agents.expansion import run_expansion_analysis, load_approved_into_config
+from agents.overseas_monitors import run_nikkei_open, run_nikkei_reopen, run_ftse_open, run_europe_handoff
+from agents.playbook_agent import run_playbook_update
+from agents.market_context import update_market_context
+from agents.speculation_agent import run_speculation
+from core.market_data import run_momentum_pulse
 
 logging.basicConfig(
     level=logging.INFO,
@@ -74,7 +74,7 @@ def _save_task_history(history: list[dict]):
 def _tracked(task_id: str, task_name: str, func):
     """Wrap a task function to record execution in the shared task history."""
     def wrapper():
-        from agent import set_current_task_id, TaskCancelledError
+        from agents.agent import set_current_task_id, TaskCancelledError
         set_current_task_id(task_id)
         # Clear any leftover cancellation flag from a previous run
         try:

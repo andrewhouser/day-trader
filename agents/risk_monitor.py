@@ -7,8 +7,8 @@ import logging
 from datetime import datetime
 
 import config
-from agent import append_to_file, call_ollama, execute_trade, load_portfolio, save_portfolio, run_hourly_check
-from market_data import fetch_instrument_prices, fetch_technical_indicators
+from agents.agent import append_to_file, call_ollama, execute_trade, load_portfolio, save_portfolio, run_hourly_check
+from core.market_data import fetch_instrument_prices, fetch_technical_indicators
 
 logger = logging.getLogger(__name__)
 
@@ -111,7 +111,7 @@ def _update_trailing_stops(portfolio: dict, instruments: dict) -> list[dict]:
     """Update trailing stops for all positions and check for breaches.
     Also checks take-profit targets. Returns list of auto-trade actions."""
     auto_trades = []
-    from regime import load_regime
+    from core.regime import load_regime
     regime_data = load_regime()
     regime_params = regime_data.get("parameters", {})
     trailing_mult = regime_params.get("stop_atr_multiplier", config.TRAILING_STOP_ATR_MULTIPLIER)
@@ -356,8 +356,8 @@ def run_risk_monitor() -> dict:
 
     # 0. Check overseas summaries for overnight risk flags
     try:
-        from overseas_monitors import get_asia_summary, get_europe_summary, get_handoff_summary
-        from exchange_calendar import is_exchange_open, get_schedule_drift_warning
+        from agents.overseas_monitors import get_asia_summary, get_europe_summary, get_handoff_summary
+        from core.exchange_calendar import is_exchange_open, get_schedule_drift_warning
 
         # Log exchange status
         jpx_open = is_exchange_open("JPX")
@@ -417,7 +417,7 @@ def run_risk_monitor() -> dict:
                 "reasoning": trade_info["reasoning"],
             }
             try:
-                from agent import validate_trade
+                from agents.agent import validate_trade
                 valid, reason = validate_trade(trade, portfolio)
                 if valid:
                     logger.warning(f"Auto-executing {trade_info['type']}: {trade['action']} {trade['quantity']:.3g}x {trade['ticker']}")
@@ -471,7 +471,7 @@ def run_risk_monitor() -> dict:
                 "reasoning": trade_info["reasoning"],
             }
             try:
-                from agent import validate_trade
+                from agents.agent import validate_trade
                 valid, reason = validate_trade(trade, portfolio)
                 if valid:
                     logger.warning(

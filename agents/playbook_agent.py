@@ -8,7 +8,7 @@ from datetime import datetime
 from pathlib import Path
 
 import config
-from agent import call_ollama, read_recent_entries
+from agents.agent import call_ollama, read_recent_entries
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +48,7 @@ def _parse_trades_for_playbook() -> list[dict]:
     Extracts: date, action, ticker, quantity, price, realized_pnl, reasoning,
     hypothesis (if present), strategy classification.
     """
-    from strategy_tracker import classify_trade_strategy
+    from core.strategy_tracker import classify_trade_strategy
 
     try:
         with open(config.TRADE_LOG_PATH, "r") as f:
@@ -108,7 +108,7 @@ def _build_pattern_summary(trades: list[dict]) -> str:
     """Build a compact text summary of trades grouped by strategy and ticker
     to feed into the LLM for pattern extraction."""
     from collections import defaultdict
-    from strategy_tracker import STRATEGY_DEFINITIONS
+    from core.strategy_tracker import STRATEGY_DEFINITIONS
 
     # Group closed trades (SELL with realized_pnl) by strategy
     closed: list[dict] = [t for t in trades if t["action"] == "SELL" and t.get("realized_pnl") is not None]
@@ -270,7 +270,7 @@ def get_adaptive_temperature() -> float:
     - No applicable patterns → TEMPERATURE_NO_PATTERN (explore)
     """
     try:
-        from strategy_tracker import _load_scores
+        from core.strategy_tracker import _load_scores
         scores = _load_scores()
     except Exception:
         return config.TEMPERATURE

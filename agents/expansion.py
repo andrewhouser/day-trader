@@ -16,7 +16,7 @@ from enum import Enum
 from typing import Optional
 
 import config
-from agent import call_ollama
+from agents.agent import call_ollama
 
 logger = logging.getLogger(__name__)
 
@@ -196,8 +196,8 @@ EXPANSION_SYSTEM = (
 def run_expansion_analysis() -> str:
     """Run the expansion analysis — uses the LLM to suggest new instruments
     based on current portfolio, market conditions, and research data."""
-    from agent import load_portfolio, read_recent_entries
-    from market_data import get_market_summary
+    from agents.agent import load_portfolio, read_recent_entries
+    from core.market_data import get_market_summary
 
     logger.info("Starting portfolio expansion analysis...")
 
@@ -303,7 +303,7 @@ that complement rather than duplicate existing exposure."""
     # Save the full analysis to research log
     now = datetime.now()
     timestamp = now.strftime("%Y-%m-%d %H:%M:%S")
-    from agent import append_to_file
+    from agents.agent import append_to_file
     entry = f"""
 ## Portfolio Expansion Analysis - {timestamp}
 

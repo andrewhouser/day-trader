@@ -14,30 +14,35 @@ describe("Nav", () => {
     vi.clearAllMocks();
   });
 
-  it("renders all navigation groups", () => {
+  it("renders standalone tabs and group tabs", () => {
     render(<Nav />);
-    expect(screen.getByText("Overview")).toBeInTheDocument();
+    expect(screen.getByText("Dashboard")).toBeInTheDocument();
+    expect(screen.getByText("Learn")).toBeInTheDocument();
     expect(screen.getByText("Trading")).toBeInTheDocument();
     expect(screen.getByText("Analysis")).toBeInTheDocument();
     expect(screen.getByText("History")).toBeInTheDocument();
     expect(screen.getByText("System")).toBeInTheDocument();
   });
 
-  it("renders navigation links for the active group", () => {
+  it("shows sub-tabs inline for the active group", () => {
+    const { usePathname } = vi.mocked(await import("next/navigation"));
+    usePathname.mockReturnValue("/trades");
+
     render(<Nav />);
-    // Default pathname is "/" which is in Overview group
-    expect(screen.getByText("Dashboard")).toBeInTheDocument();
-    expect(screen.getByText("Learn")).toBeInTheDocument();
+    // Trading sub-tabs should be visible
+    expect(screen.getByText("Trades")).toBeInTheDocument();
+    expect(screen.getByText("Expansion")).toBeInTheDocument();
+    expect(screen.getByText("Research")).toBeInTheDocument();
+    expect(screen.getByText("Technicals")).toBeInTheDocument();
   });
 
-  it("marks the active link based on pathname", () => {
+  it("marks the active sub-tab and group tab", () => {
     const { usePathname } = vi.mocked(await import("next/navigation"));
     usePathname.mockReturnValue("/trades");
 
     render(<Nav />);
     const tradesLink = screen.getByRole("tab", { name: "Trades" });
     expect(tradesLink).toHaveAttribute("aria-selected", "true");
-    // Trading group should also be active
     const tradingGroup = screen.getByRole("tab", { name: "Trading" });
     expect(tradingGroup).toHaveAttribute("aria-selected", "true");
   });
@@ -48,6 +53,9 @@ describe("Nav", () => {
   });
 
   it("shows pending dot when there are pending proposals", async () => {
+    const { usePathname } = vi.mocked(await import("next/navigation"));
+    usePathname.mockReturnValue("/expansion");
+
     const { api } = await import("@/lib/api");
     vi.mocked(api.getProposals).mockResolvedValue([
       { id: "1", status: "pending" } as Parameters<typeof api.getProposals>[0] extends string
@@ -56,7 +64,6 @@ describe("Nav", () => {
     ] as Awaited<ReturnType<typeof api.getProposals>>);
 
     render(<Nav />);
-    // pending dot aria-label should appear after async check
     await screen.findByLabelText("1 pending proposals");
   });
 });

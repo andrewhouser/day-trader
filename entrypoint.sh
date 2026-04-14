@@ -43,43 +43,43 @@ case "${1:-api}" in
         ;;
     hourly)
         echo "Running one-time hourly check..."
-        exec python3 -c "from agent import run_hourly_check; run_hourly_check()"
+        exec python3 -c "from agents.agent import run_hourly_check; run_hourly_check()"
         ;;
     report)
         echo "Running one-time morning report..."
-        exec python3 -c "from agent import run_morning_report; run_morning_report()"
+        exec python3 -c "from agents.agent import run_morning_report; run_morning_report()"
         ;;
     research)
         echo "Running one-time research cycle..."
-        exec python3 -c "from agent import run_research; run_research()"
+        exec python3 -c "from agents.agent import run_research; run_research()"
         ;;
     compact)
         echo "Running one-time memory compaction..."
-        exec python3 -c "from compactor import run_compaction; run_compaction()"
+        exec python3 -c "from agents.compactor import run_compaction; run_compaction()"
         ;;
     sentiment)
         echo "Running one-time sentiment analysis..."
-        exec python3 -c "from sentiment_agent import run_sentiment; run_sentiment()"
+        exec python3 -c "from agents.sentiment_agent import run_sentiment; run_sentiment()"
         ;;
     risk)
         echo "Running one-time risk monitor check..."
-        exec python3 -c "from risk_monitor import run_risk_monitor; run_risk_monitor()"
+        exec python3 -c "from agents.risk_monitor import run_risk_monitor; run_risk_monitor()"
         ;;
     rebalance)
         echo "Running one-time portfolio rebalance..."
-        exec python3 -c "from rebalancer import run_rebalancer; run_rebalancer()"
+        exec python3 -c "from agents.rebalancer import run_rebalancer; run_rebalancer()"
         ;;
     performance)
         echo "Running one-time performance analysis..."
-        exec python3 -c "from performance_analyst import run_performance_analysis; run_performance_analysis()"
+        exec python3 -c "from agents.performance_analyst import run_performance_analysis; run_performance_analysis()"
         ;;
     events)
         echo "Running one-time events calendar update..."
-        exec python3 -c "from events_agent import run_events_calendar; run_events_calendar()"
+        exec python3 -c "from agents.events_agent import run_events_calendar; run_events_calendar()"
         ;;
     expansion)
         echo "Running one-time portfolio expansion analysis..."
-        exec python3 -c "from expansion import run_expansion_analysis; run_expansion_analysis()"
+        exec python3 -c "from agents.expansion import run_expansion_analysis; run_expansion_analysis()"
         ;;
     *)
         echo "Unknown command: $1"

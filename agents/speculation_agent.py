@@ -12,8 +12,8 @@ import logging
 from datetime import datetime
 
 import config
-from agent import call_ollama, load_portfolio, read_recent_entries
-from market_data import fetch_technical_indicators, get_technicals_summary
+from agents.agent import call_ollama, load_portfolio, read_recent_entries
+from core.market_data import fetch_technical_indicators, get_technicals_summary
 
 logger = logging.getLogger(__name__)
 
@@ -155,7 +155,7 @@ opportunity landscape and what you're watching for."""
 
 ---
 """
-    from agent import append_to_file
+    from agents.agent import append_to_file
     append_to_file(config.SPECULATION_PATH, entry)
     logger.info(f"Speculation analysis saved ({len(speculations)} opportunities, {len(response)} chars)")
     return response

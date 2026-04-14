@@ -34,7 +34,7 @@ def detect_regime(technicals: dict | None = None) -> dict:
         Dict with regime classification and supporting signals.
     """
     if technicals is None:
-        from market_data import fetch_technical_indicators
+        from core.market_data import fetch_technical_indicators
         technicals = fetch_technical_indicators()
 
     spy_data = technicals.get("SPY", {})

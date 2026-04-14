@@ -33,7 +33,7 @@ def generate_human_summary(report: MarketReport) -> str:
 
 def _llm_summary(report: MarketReport) -> str:
     """Use the LLM to synthesize a polished market brief."""
-    from agent import call_ollama
+    from agents.agent import call_ollama
     import config
 
     # Build context from report data

@@ -12,15 +12,15 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 import config
-from agent import (
+from agents.agent import (
     load_portfolio,
     read_recent_entries,
     run_hourly_check,
     run_morning_report,
     run_research,
 )
-from compactor import run_compaction
-from expansion import (
+from agents.compactor import run_compaction
+from agents.expansion import (
     get_proposals,
     get_proposal,
     approve_proposal,
@@ -28,17 +28,17 @@ from expansion import (
     run_expansion_analysis,
     load_approved_into_config,
 )
-from market_data import fetch_index_levels, fetch_instrument_prices, fetch_technical_indicators
-from sentiment_agent import run_sentiment
-from risk_monitor import run_risk_monitor
-from rebalancer import run_rebalancer
-from performance_analyst import run_performance_analysis
-from events_agent import run_events_calendar
-from playbook_agent import run_playbook_update
-from market_context import update_market_context
-from regime import detect_regime, load_regime
-from overseas_monitors import run_nikkei_open, run_nikkei_reopen, run_ftse_open, run_europe_handoff
-from speculation_agent import run_speculation
+from core.market_data import fetch_index_levels, fetch_instrument_prices, fetch_technical_indicators
+from agents.sentiment_agent import run_sentiment
+from agents.risk_monitor import run_risk_monitor
+from agents.rebalancer import run_rebalancer
+from agents.performance_analyst import run_performance_analysis
+from agents.events_agent import run_events_calendar
+from agents.playbook_agent import run_playbook_update
+from agents.market_context import update_market_context
+from core.regime import detect_regime, load_regime
+from agents.overseas_monitors import run_nikkei_open, run_nikkei_reopen, run_ftse_open, run_europe_handoff
+from agents.speculation_agent import run_speculation
 
 logger = logging.getLogger(__name__)
 
@@ -150,7 +150,7 @@ def clear_task_cancelled(task_id: str):
 def _run_task_in_thread(task_id: str, task_name: str, func):
     """Run an agent task in a background thread, tracking status."""
     global _task_history
-    from agent import set_current_task_id, TaskCancelledError
+    from agents.agent import set_current_task_id, TaskCancelledError
     clear_task_cancelled(task_id)
     set_current_task_id(task_id)
     start_time = datetime.now().isoformat()
@@ -871,7 +871,7 @@ def get_handoff_summary(limit: int = 3):
 @app.get("/api/overseas/signals")
 def get_overseas_signals():
     """Return all overseas trade signals (pending and evaluated)."""
-    from overseas_signals import _load_signals, _prune_stale
+    from core.overseas_signals import _load_signals, _prune_stale
     signals = _prune_stale(_load_signals())
     pending = [s for s in signals if s.get("status") == "pending"]
     evaluated = [s for s in signals if s.get("status") == "evaluated"]
@@ -891,7 +891,7 @@ def get_playbook():
 @app.get("/api/strategy-scores")
 def get_strategy_scores():
     """Return per-strategy win/loss statistics."""
-    from strategy_tracker import _load_scores
+    from core.strategy_tracker import _load_scores
     return _load_scores()
 
 
@@ -908,7 +908,7 @@ def get_market_context():
 @app.get("/api/benchmark")
 def get_benchmark():
     """Return portfolio vs SPY benchmark comparison."""
-    from benchmark import compute_benchmark_comparison
+    from core.benchmark import compute_benchmark_comparison
     try:
         return compute_benchmark_comparison()
     except Exception as e:
@@ -918,7 +918,7 @@ def get_benchmark():
 @app.get("/api/exchange-calendar")
 def get_exchange_calendar_status():
     """Return current exchange session status, holidays, and DST info."""
-    from exchange_calendar import get_current_session_info
+    from core.exchange_calendar import get_current_session_info
     return get_current_session_info()
 
 
@@ -1049,7 +1049,7 @@ def clear_research_cache():
 @app.get("/api/score-weights")
 def get_score_weights():
     """Return current adaptive score dimension weights."""
-    from score_weights import _load_all, DEFAULT_WEIGHTS
+    from core.score_weights import _load_all, DEFAULT_WEIGHTS
     all_weights = _load_all()
     return {"weights": all_weights, "defaults": DEFAULT_WEIGHTS}
 
@@ -1063,7 +1063,7 @@ _STRESS_CACHE_TTL = 300  # 5 minutes
 @app.get("/api/stress-test")
 def get_stress_test():
     """Run portfolio stress test scenarios and return results."""
-    from stress_test import run_stress_test
+    from core.stress_test import run_stress_test
 
     now = datetime.now()
     if (_stress_cache["result"] is not None
@@ -1138,7 +1138,7 @@ CHAT_TIMEOUT = int(os.getenv("CHAT_TIMEOUT", "300"))
 
 def _build_chat_context() -> str:
     """Gather current agent state for the chat LLM context."""
-    from agent import call_ollama, read_recent_entries
+    from agents.agent import call_ollama, read_recent_entries
 
     sections = []
 
@@ -1238,7 +1238,7 @@ class ChatRequest(BaseModel):
 @app.post("/api/chat")
 def chat(body: ChatRequest):
     """Chat with the trading agent about its decisions."""
-    from agent import call_ollama_direct
+    from agents.agent import call_ollama_direct
 
     message = body.message.strip()
     if not message:

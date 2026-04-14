@@ -198,7 +198,7 @@ def update_market_context(days: int = 30) -> str:
 
     # Correlation structure note (lightweight — just reads current state)
     try:
-        from market_data import fetch_correlation_matrix
+        from core.market_data import fetch_correlation_matrix
         corr = fetch_correlation_matrix(lookback_days=min(days, 20))
         high_pairs = corr.get("high_correlation_pairs", [])
         if high_pairs:
@@ -211,7 +211,7 @@ def update_market_context(days: int = 30) -> str:
     # Strategy ladder summary
     strategy_section = ""
     try:
-        from strategy_tracker import get_strategy_ladder
+        from core.strategy_tracker import get_strategy_ladder
         strategy_section = get_strategy_ladder()
     except Exception:
         strategy_section = "Strategy scores unavailable."

@@ -8,7 +8,7 @@ from datetime import datetime
 import requests
 
 import config
-from market_data import (
+from core.market_data import (
     get_market_summary,
     get_technicals_summary,
     fetch_technical_indicators,
@@ -16,8 +16,8 @@ from market_data import (
     get_correlation_summary,
     get_intraday_reversal_summary,
 )
-from regime import detect_regime, get_regime_summary, load_regime
-from position_sizing import get_sizing_summary
+from core.regime import detect_regime, get_regime_summary, load_regime
+from core.position_sizing import get_sizing_summary
 
 logger = logging.getLogger(__name__)
 
@@ -413,13 +413,13 @@ def execute_trade(trade: dict, portfolio: dict, technicals: dict | None = None) 
         hyp_lines += f"- **Horizon:** {horizon}\n"
 
     # Strategy classification
-    from strategy_tracker import classify_trade_strategy
+    from core.strategy_tracker import classify_trade_strategy
     strategy = classify_trade_strategy(reasoning)
     strategy_line = f"- **Strategy:** {strategy}\n"
 
     # Update strategy scores for closed SELL trades
     if action == "SELL" and trade.get("realized_pnl") is not None:
-        from strategy_tracker import update_strategy_scores
+        from core.strategy_tracker import update_strategy_scores
         # Use _entry_price stashed in the SELL branch above — NOT the sell price.
         entry_price_for_scoring = trade.get("_entry_price", price)
         update_strategy_scores(strategy, trade["realized_pnl"], entry_price_for_scoring, quantity)
@@ -446,7 +446,7 @@ def execute_trade(trade: dict, portfolio: dict, technicals: dict | None = None) 
 def _check_stop_loss_and_opportunities(portfolio: dict, instruments: dict) -> list[dict]:
     """Check positions for stop-loss breaches and instruments for opportunity surges.
     Returns a list of alert dicts describing what was detected."""
-    from market_data import fetch_instrument_prices
+    from core.market_data import fetch_instrument_prices
 
     alerts = []
 
@@ -719,7 +719,7 @@ This note will be read before your next hourly trading check."""
     logger.info(f"Research note saved to {config.RESEARCH_PATH} and {snapshot_path}")
 
     # ── 4. Check for stop-loss / opportunity alerts ────────
-    from market_data import fetch_instrument_prices
+    from core.market_data import fetch_instrument_prices
     instruments = fetch_instrument_prices()
     portfolio = load_portfolio()  # reload in case it changed
     alerts = _check_stop_loss_and_opportunities(portfolio, instruments)
@@ -772,7 +772,7 @@ def run_hourly_check():
 
     def _get_weights_for_prompt() -> str:
         try:
-            from score_weights import get_weights_summary
+            from core.score_weights import get_weights_summary
             return get_weights_summary()
         except Exception:
             return "No learned weights yet — all dimensions weighted equally at 1.0."
@@ -831,7 +831,7 @@ def run_hourly_check():
     recent_sentiment = read_recent_entries(config.SENTIMENT_PATH, 3)
     speculation_context = ""
     try:
-        from speculation_agent import get_speculation_for_prompt
+        from agents.speculation_agent import get_speculation_for_prompt
         speculation_context = get_speculation_for_prompt(max_entries=2)
     except Exception:
         pass
@@ -849,17 +849,17 @@ def run_hourly_check():
     europe_summary = read_recent_entries(config.FTSE_MONITOR_PATH, 2)
 
     # Read pending overseas trade signals
-    from overseas_signals import get_pending_signals, format_signals_for_prompt, mark_signals_evaluated
+    from core.overseas_signals import get_pending_signals, format_signals_for_prompt, mark_signals_evaluated
     pending_overseas_signals = get_pending_signals()
     overseas_signals_block = format_signals_for_prompt(pending_overseas_signals)
 
     # 3a. Rolling 30-day market context
-    from market_context import get_market_context_for_prompt
+    from agents.market_context import get_market_context_for_prompt
     rolling_context = get_market_context_for_prompt()
 
     # 3b. Strategy playbook and score ladder
-    from playbook_agent import get_playbook_context
-    from strategy_tracker import get_strategy_ladder, get_suspended_strategies
+    from agents.playbook_agent import get_playbook_context
+    from core.strategy_tracker import get_strategy_ladder, get_suspended_strategies
     playbook_context = get_playbook_context(max_chars=2500)
     strategy_ladder = get_strategy_ladder()
     suspended_strategies = get_suspended_strategies()
@@ -868,15 +868,15 @@ def run_hourly_check():
     sizing_summary = get_sizing_summary(technicals, portfolio["total_value_usd"], regime_params)
 
     # 5. Load quantitative feedback
-    from performance_analyst import get_performance_feedback
+    from agents.performance_analyst import get_performance_feedback
     perf_feedback = get_performance_feedback()
 
     # 5.1 Portfolio-level benchmark comparison
-    from benchmark import get_benchmark_for_prompt
+    from core.benchmark import get_benchmark_for_prompt
     benchmark_feedback = get_benchmark_for_prompt()
 
     # 5a. Confidence-gated temperature — exploit known patterns vs. explore novel ones
-    from playbook_agent import get_adaptive_temperature
+    from agents.playbook_agent import get_adaptive_temperature
     adaptive_temp = get_adaptive_temperature()
     logger.info(f"Adaptive temperature: {adaptive_temp} (default: {config.TEMPERATURE})")
 
