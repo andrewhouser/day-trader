@@ -1021,7 +1021,7 @@ INSTRUCTIONS:
    - Reversals in broad indices (SPY, QQQ, DIA) suggest the market is finding a floor — this can support BUY decisions in instruments with strong individual technicals.
    - A reversal alone is NOT sufficient for a trade — it must be combined with positive trend/momentum scores. But it IS a reason to look harder at instruments you might otherwise skip.
    - Intraday reversals are most meaningful when they occur on above-average volume.
-9.9. **CASH EFFICIENCY** — Your portfolio is currently {cash_pct:.0f}% cash.{f' Cash exceeds {config.HIGH_CASH_PCT:.0f}%, so the buy threshold has been REDUCED to {effective_buy_threshold}. You should actively look for the best available opportunity rather than waiting for a perfect setup. A composite score of {effective_buy_threshold} with good risk/reward is better than sitting in cash during a recovering market. The cost of missing a reversal is real — deploy capital cautiously but proactively.' if cash_pct >= config.HIGH_CASH_PCT else ' Cash level is within normal range.'}
+9.9. **CASH EFFICIENCY** — Your portfolio is currently {cash_pct:.0f}% cash.{f' Cash exceeds {config.HIGH_CASH_PCT:.0f}%, so the buy threshold has been REDUCED to {effective_buy_threshold}. You should actively look for the best available opportunity rather than waiting for a perfect setup. A composite score of {effective_buy_threshold} with good risk/reward is better than sitting in cash during a recovering market. The cost of missing a reversal is real — deploy capital cautiously but proactively.' if cash_pct >= config.HIGH_CASH_PCT else ''}{f' Cash is LOW ({cash_pct:.0f}%). If you see a strong opportunity (composite > {effective_buy_threshold}), consider ROTATING out of your weakest-scoring position to fund it. Do not let low cash prevent you from upgrading the portfolio.' if cash_pct < 15 and len(portfolio.get('positions', [])) > 0 else ''}
 10. Check STOP-LOSS & TAKE-PROFIT levels for existing positions. Trailing stops are managed automatically, but factor them into your analysis.
 10.5. **OVERSEAS TRADE SIGNALS** — If there are pending overseas signals above, evaluate each one:
    - Apply the standard scoring framework to the signal's ticker. The signal provides context (direction, move %, driver) but does NOT bypass your scoring thresholds.
@@ -1080,7 +1080,14 @@ The hypothesis fields are MANDATORY for all BUY trades. They are used to evaluat
 and to build the strategy playbook over time. A trade without a clear hypothesis is a gamble, not a decision.
 
 12. If you decide NOT to trade, explain why clearly. Include what you considered, what almost triggered a trade, and what conditions would change your mind.
-13. You may output multiple trade JSON blocks if you want to make multiple trades.
+12.5. **POSITION ROTATION** — You have NO loyalty to any position. Every position must continuously earn its place in the portfolio. If you identify a BUY opportunity with composite score above the buy threshold but lack sufficient cash:
+   - Score ALL current positions using the same framework.
+   - If any held position scores LOWER than the new opportunity, SELL it first to free cash, then BUY the better instrument. Output the SELL trade BEFORE the BUY trade so cash is available.
+   - You do NOT need the position to score below {config.SCORE_SELL_THRESHOLD} to sell it for rotation. A position scoring +1 can be sold to fund a position scoring +4. The only question is: "Which allocation produces the best expected growth?"
+   - Even positions with small unrealized gains or losses are candidates for rotation. A $0.50 unrealized loss is irrelevant if the new opportunity has significantly better risk/reward.
+   - When rotating, state explicitly: "ROTATION: Selling [TICKER] (composite: X) to fund [TICKER] (composite: Y)" in your reasoning for both the SELL and BUY trades.
+   - Do NOT rotate just to rotate. The new opportunity must score meaningfully higher (at least 2 points above the position being sold) to justify transaction friction.
+13. You may output multiple trade JSON blocks if you want to make multiple trades. When rotating positions, output the SELL block first, then the BUY block.
 14. After your trading decision, write a brief reflection on this analysis cycle.
 
 ### Score Dimension Weights (learned from trade history)

@@ -350,6 +350,15 @@ Before any trade, the LLM must score each instrument on six dimensions (-2 to +2
 
 Thresholds are configurable via `SCORE_BUY_THRESHOLD`, `SCORE_SELL_THRESHOLD`, `SCORE_BUY_THRESHOLD_HIGH_CASH`, and `SCORE_BUY_THRESHOLD_SPECULATIVE`. The dynamic buy threshold activates automatically when cash exceeds `HIGH_CASH_PCT` (default 70%). Adaptive per-instrument weights are learned from trade outcomes and applied to the composite calculation.
 
+### Position Rotation
+No position has permanent loyalty. Every holding must continuously earn its place in the portfolio. When the agent identifies a BUY opportunity above the buy threshold but lacks sufficient cash, it:
+
+1. Scores all currently held positions using the same six-dimension framework
+2. If any held position scores lower than the new opportunity by at least 2 composite points, sells it first to free cash
+3. Outputs the SELL trade before the BUY trade so the sequential execution frees capital in time
+
+This prevents the agent from getting stuck fully invested in mediocre positions while better opportunities pass by. When cash drops below 15%, the prompt explicitly nudges the agent to consider rotation. A minimum 2-point score gap is required to avoid unnecessary churn.
+
 ### Hypothesis Tracking
 All BUY trades require structured hypothesis fields:
 - **Hypothesis:** What must be true for this trade to work
