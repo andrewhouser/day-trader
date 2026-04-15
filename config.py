@@ -180,24 +180,36 @@ REGIME_PARAMS = {
         "max_position_pct": 0.25,
         "stop_atr_multiplier": 2.0,
         "regime_multiplier": 1.0,
+        # Non-ETF take-profit: let momentum plays run far; ETFs use trailing stop only
+        "take_profit_partial_pct": 12.0,
+        "take_profit_full_pct": 22.0,
         "strategy_note": "Strong uptrend — full position sizes, favor buying dips in cyclicals (XLK, XLF, XLE)",
     },
     "UPTREND": {
         "max_position_pct": 0.25,
         "stop_atr_multiplier": 2.0,
         "regime_multiplier": 1.0,
+        # Non-ETF take-profit: generous thresholds to capture trend
+        "take_profit_partial_pct": 8.0,
+        "take_profit_full_pct": 15.0,
         "strategy_note": "Uptrend — full position sizes, favor buying dips",
     },
     "SIDEWAYS": {
         "max_position_pct": 0.15,
         "stop_atr_multiplier": 2.0,
         "regime_multiplier": 0.75,
+        # Non-ETF take-profit: mean-reversion mindset, bank gains at moderate targets
+        "take_profit_partial_pct": 5.0,
+        "take_profit_full_pct": 8.0,
         "strategy_note": "Sideways — reduce max position to 15%, favor mean reversion",
     },
     "DOWNTREND": {
         "max_position_pct": 0.12,
         "stop_atr_multiplier": 1.5,
         "regime_multiplier": 0.7,
+        # Non-ETF take-profit: take gains quickly before the market drags them down
+        "take_profit_partial_pct": 4.0,
+        "take_profit_full_pct": 7.0,
         "strategy_note": (
             "Downtrend — reduce max position to 10%, favor cash and defensives (XLU, XLP, TLT, SHY, GLD). "
             "REGIME BIAS IS A DEFAULT, NOT AN ABSOLUTE RULE: before dismissing any instrument, check whether "
@@ -213,6 +225,9 @@ REGIME_PARAMS = {
         "max_position_pct": 0.10,
         "stop_atr_multiplier": 1.5,
         "regime_multiplier": 0.5,
+        # Non-ETF take-profit: aggressively protect gains, market is deteriorating
+        "take_profit_partial_pct": 3.0,
+        "take_profit_full_pct": 5.0,
         "strategy_note": (
             "Strong downtrend — reduce max position to 10%, favor cash, tighten stops, defensives only "
             "(XLU, XLP, TLT, SHY, GLD). Divergence exceptions require very high conviction: 5+ sessions of "
@@ -225,6 +240,9 @@ REGIME_PARAMS = {
         "max_position_pct": 0.10,
         "stop_atr_multiplier": 2.5,
         "regime_multiplier": 0.5,
+        # Non-ETF take-profit: slightly looser to absorb ATR noise, but still cautious
+        "take_profit_partial_pct": 6.0,
+        "take_profit_full_pct": 10.0,
         "strategy_note": "High volatility — reduce max position to 10%, widen stops to 2.5x ATR, favor safe havens (GLD, TLT, SHY)",
     },
 }

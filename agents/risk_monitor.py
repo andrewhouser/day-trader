@@ -164,10 +164,27 @@ def _update_trailing_stops(portfolio: dict, instruments: dict) -> list[dict]:
             continue  # Don't check take-profit if we're selling everything
 
         # Check take-profit targets
+        # ETFs rely solely on the trailing stop to let trends run; skip fixed take-profit.
+        instrument_type = config.INSTRUMENTS.get(ticker, {}).get("type", "")
+        is_etf = instrument_type == "ETF"
+        if is_etf:
+            continue
+
         gain_pct = ((current_price - entry_price) / entry_price) * 100 if entry_price > 0 else 0
         partial_hit = pos.get("take_profit_partial_hit", False)
 
-        if not partial_hit and gain_pct >= config.TAKE_PROFIT_PARTIAL_PCT:
+        # Use regime-aware thresholds for non-ETFs; fall back to global defaults
+        regime_label = regime_data.get("regime", "")
+        regime_tp_partial = regime_params.get(
+            "take_profit_partial_pct",
+            config.REGIME_PARAMS.get(regime_label, {}).get("take_profit_partial_pct", config.TAKE_PROFIT_PARTIAL_PCT),
+        )
+        regime_tp_full = regime_params.get(
+            "take_profit_full_pct",
+            config.REGIME_PARAMS.get(regime_label, {}).get("take_profit_full_pct", config.TAKE_PROFIT_FULL_PCT),
+        )
+
+        if not partial_hit and gain_pct >= regime_tp_partial:
             # Sell 50% at partial take-profit
             sell_qty = round(pos["quantity"] * 0.5, 3)
             if sell_qty > 0:
@@ -181,10 +198,10 @@ def _update_trailing_stops(portfolio: dict, instruments: dict) -> list[dict]:
                     "reasoning": (
                         f"AUTOMATIC TAKE-PROFIT (50%): {ticker} up {gain_pct:.1f}% "
                         f"from entry ${entry_price} to ${current_price} "
-                        f"(threshold: {config.TAKE_PROFIT_PARTIAL_PCT}%)"
+                        f"(regime: {regime_label}, threshold: {regime_tp_partial}%)"
                     ),
                 })
-        elif partial_hit and gain_pct >= config.TAKE_PROFIT_FULL_PCT:
+        elif partial_hit and gain_pct >= regime_tp_full:
             # Sell remaining at full take-profit
             auto_trades.append({
                 "type": "take_profit_full",
@@ -195,7 +212,7 @@ def _update_trailing_stops(portfolio: dict, instruments: dict) -> list[dict]:
                 "reasoning": (
                     f"AUTOMATIC TAKE-PROFIT (remaining): {ticker} up {gain_pct:.1f}% "
                     f"from entry ${entry_price} to ${current_price} "
-                    f"(threshold: {config.TAKE_PROFIT_FULL_PCT}%)"
+                    f"(regime: {regime_label}, threshold: {regime_tp_full}%)"
                 ),
             })
 

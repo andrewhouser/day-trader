@@ -294,12 +294,12 @@ The system classifies the current market into one of six regimes, stored in `reg
 
 | Regime | Conditions | Trading Adjustments |
 |--------|-----------|-------------------|
-| STRONG_UPTREND | SPY above SMA 50 & 200, golden cross, ROC > 3% | Full position sizes (25%), favor cyclicals (XLK, XLF, XLE) |
-| UPTREND | SPY above SMA 50 & 200, positive ROC | Full position sizes, favor buying dips |
-| SIDEWAYS | Mixed signals | Reduce max position to 15%, favor mean reversion |
-| DOWNTREND | SPY below SMA 50 & 200, negative ROC | Reduce max position to 12%, favor cash and defensives (XLU, XLP, TLT, SHY, GLD), regime multiplier 0.7× |
-| STRONG_DOWNTREND | SPY below SMA 50 & 200, death cross, ROC < -3% | Reduce max position to 10%, tighten stops |
-| HIGH_VOLATILITY | VIX > 30 | Reduce max position to 10%, widen stops to 2.5x ATR, favor safe havens |
+| STRONG_UPTREND | SPY above SMA 50 & 200, golden cross, ROC > 3% | Full position sizes (25%), favor cyclicals (XLK, XLF, XLE); non-ETF TP: 12%/22% |
+| UPTREND | SPY above SMA 50 & 200, positive ROC | Full position sizes, favor buying dips; non-ETF TP: 8%/15% |
+| SIDEWAYS | Mixed signals | Reduce max position to 15%, favor mean reversion; non-ETF TP: 5%/8% |
+| DOWNTREND | SPY below SMA 50 & 200, negative ROC | Reduce max position to 12%, favor cash and defensives, regime multiplier 0.7×; non-ETF TP: 4%/7% |
+| STRONG_DOWNTREND | SPY below SMA 50 & 200, death cross, ROC < -3% | Reduce max position to 10%, tighten stops; non-ETF TP: 3%/5% |
+| HIGH_VOLATILITY | VIX > 30 | Reduce max position to 10%, widen stops to 2.5x ATR, favor safe havens; non-ETF TP: 6%/10% |
 
 Regime detection uses: SPY price vs SMA 50/200, golden/death cross, RSI, VIX level, and 20-day rate of change.
 
@@ -320,8 +320,18 @@ Regime detection uses: SPY price vs SMA 50/200, golden/death cross, RSI, VIX lev
 ### Trailing Stops & Take-Profit (Automatic)
 - **Initial stop-loss:** Entry price minus 1.5× ATR, set when a position is opened
 - **Trailing stop:** Highest price since entry minus 2× ATR (regime-adjusted), ratchets up only
-- **Partial take-profit:** Automatically sells 50% of a position when up 5% from entry
-- **Full take-profit:** Automatically sells the remaining position when up 8% from entry
+- **ETF exits — trailing stop only:** All ETF positions (SPY, QQQ, sector ETFs, bond ETFs, commodity ETFs) rely solely on the trailing stop for exits. Fixed take-profit targets are not applied, allowing trend-following positions to run as far as the momentum carries them.
+- **Non-ETF take-profit (regime-aware):** Individual equity and other non-ETF positions use take-profit thresholds that scale with the current regime:
+
+  | Regime | Partial TP (sell 50%) | Full TP (sell remaining) |
+  |---|---|---|
+  | STRONG_UPTREND | 12% | 22% |
+  | UPTREND | 8% | 15% |
+  | SIDEWAYS | 5% | 8% |
+  | DOWNTREND | 4% | 7% |
+  | STRONG_DOWNTREND | 3% | 5% |
+  | HIGH_VOLATILITY | 6% | 10% |
+
 - Stop and target levels are stored in `portfolio.json` alongside each position
 - The risk monitor checks and executes these every 3 minutes during market hours
 

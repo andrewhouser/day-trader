@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-04-15
+
+### Changed
+- **ETF take-profit exemption** — all instruments with `"type": "ETF"` in `config.INSTRUMENTS` (SPY, QQQ, DIA, sector ETFs, bond ETFs, commodity ETFs) no longer trigger fixed take-profit sells. These positions now exit exclusively via the ATR-based trailing stop, allowing trend-following positions to run as far as momentum carries them rather than being capped at a fixed percentage gain.
+- **Regime-aware take-profit thresholds for non-ETFs** — take-profit thresholds for individual equities and other non-ETF instruments now scale with the current market regime instead of using fixed global values. In uptrend regimes the thresholds are widened (partial 8–12%, full 15–22%) to let momentum plays run; in downtrend and high-volatility regimes they are tightened (partial 3–6%, full 5–10%) to protect gains before market conditions deteriorate further. Thresholds are defined in `REGIME_PARAMS` and read at runtime by the risk monitor. Reasoning messages in auto-trades now include the active regime label and the thresholds used.
+- **`TAKE_PROFIT_PARTIAL_PCT` / `TAKE_PROFIT_FULL_PCT` global defaults retained** as a fallback for non-ETF positions when no regime data is available (default: 5% / 8%).
+
 ## 2026-04-14
 
 ### Added
