@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-04-16
+
+### Changed
+- **Portfolio History tooltip labels** — the hover table on the Portfolio History chart now displays each series name (e.g. "Portfolio Value", "Cash", "EWJ") alongside its dollar value, making it easy to identify individual investment lines without referencing the legend.
+
 ## 2026-04-15
 
 ### Changed
