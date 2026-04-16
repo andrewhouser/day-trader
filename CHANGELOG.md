@@ -4,6 +4,8 @@
 
 ### Changed
 - **Portfolio History tooltip labels** — the hover table on the Portfolio History chart now displays each series name (e.g. "Portfolio Value", "Cash", "EWJ") alongside its dollar value, making it easy to identify individual investment lines without referencing the legend.
+- **Portfolio History interactive legend** — replaced the static recharts legend with a custom interactive one. Clicking any position ticker in the legend isolates the view to show only that investment alongside Portfolio Value; clicking it again restores all lines. Non-position items (Portfolio Value, Cash) are not clickable. Switching the date range resets isolation. Dimmed items indicate what is hidden in the current isolated view.
+- **Portfolio History tooltip ordering** — Portfolio Value is now always the first entry in the hover tooltip regardless of alphabetical ordering.
 
 ## 2026-04-15
 

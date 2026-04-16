@@ -76,9 +76,11 @@ export function PortfolioChart() {
   const [data, setData] = useState<PortfolioSnapshot[]>([]);
   const [loading, setLoading] = useState(true);
   const [range, setRange] = useState(getSavedRange);
+  const [isolatedTicker, setIsolatedTicker] = useState<string | null>(null);
 
   function changeRange(days: number) {
     setRange(days);
+    setIsolatedTicker(null);
     localStorage.setItem(STORAGE_KEY, String(days));
   }
 
@@ -97,6 +99,25 @@ export function PortfolioChart() {
     }
     return Array.from(tickers).sort();
   }, [data]);
+
+  // Legend items for the custom interactive legend
+  const legendItems = useMemo(
+    () => [
+      { color: "var(--green)", dashed: false, key: "Portfolio Value" },
+      { color: "var(--blue)", dashed: false, key: "Cash" },
+      ...positionTickers.map((t, i) => ({
+        color: POSITION_COLORS[i % POSITION_COLORS.length],
+        dashed: true,
+        key: t,
+      })),
+    ],
+    [positionTickers],
+  );
+
+  function handleLegendClick(key: string) {
+    if (!positionTickers.includes(key)) return;
+    setIsolatedTicker((prev) => (prev === key ? null : key));
+  }
 
   // Build chart data with dynamic position keys
   const chartData = useMemo(
@@ -197,9 +218,14 @@ export function PortfolioChart() {
                 fontSize: 13,
               }}
               formatter={(v, name) => [`$${Number(v ?? 0).toFixed(2)}`, name as string]}
+              itemSorter={(item) => {
+                const key = item.dataKey as string;
+                if (key === "Portfolio Value") return 0;
+                if (key === "Cash") return 1;
+                return positionTickers.indexOf(key) + 2;
+              }}
               labelFormatter={(v) => new Date(v as string).toLocaleString()}
             />
-            <Legend wrapperStyle={{ fontSize: 12 }} />
             <Area
               dataKey="Portfolio Value"
               dot={false}
@@ -212,6 +238,7 @@ export function PortfolioChart() {
               dataKey="Cash"
               dot={false}
               fill="url(#gradCash)"
+              hide={isolatedTicker !== null}
               stroke="var(--blue)"
               strokeWidth={1.5}
               type="monotone"
@@ -221,6 +248,7 @@ export function PortfolioChart() {
                 connectNulls
                 dataKey={ticker}
                 dot={false}
+                hide={isolatedTicker !== null && isolatedTicker !== ticker}
                 key={ticker}
                 stroke={POSITION_COLORS[i % POSITION_COLORS.length]}
                 strokeDasharray="4 2"
@@ -230,6 +258,36 @@ export function PortfolioChart() {
             ))}
           </AreaChart>
         </ResponsiveContainer>
+      )}
+
+      {!loading && data.length > 0 && legendItems.length > 0 && (
+        <div className={styles.customLegend}>
+          {legendItems.map(({ key, color, dashed }) => {
+            const isDimmed =
+              isolatedTicker !== null && key !== "Portfolio Value" && key !== isolatedTicker;
+            const isClickable = positionTickers.includes(key);
+            return (
+              <span
+                className={`${styles.legendItem}${isClickable ? ` ${styles.legendClickable}` : ""}${isDimmed ? ` ${styles.legendDimmed}` : ""}`}
+                key={key}
+                onClick={() => handleLegendClick(key)}
+              >
+                <svg height="4" width="16">
+                  <line
+                    stroke={color}
+                    strokeDasharray={dashed ? "4 2" : undefined}
+                    strokeWidth="2"
+                    x1="0"
+                    x2="16"
+                    y1="2"
+                    y2="2"
+                  />
+                </svg>
+                {key}
+              </span>
+            );
+          })}
+        </div>
       )}
 
       {!loading && data.length > 0 && (

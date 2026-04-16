@@ -42,3 +42,34 @@
 .sectionTitleInline {
   margin: 0;
 }
+
+.customLegend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 1rem;
+  font-size: 0.75rem;
+  justify-content: center;
+  margin-top: 0.5rem;
+}
+
+.legendItem {
+  align-items: center;
+  color: var(--text-muted);
+  display: flex;
+  gap: 0.35rem;
+  user-select: none;
+}
+
+.legendClickable {
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.legendClickable:hover {
+  opacity: 0.75;
+}
+
+.legendDimmed {
+  opacity: 0.25;
+  transition: opacity 0.15s;
+}
