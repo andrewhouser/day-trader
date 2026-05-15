@@ -18,23 +18,36 @@ RESEARCH_TIMEOUT = int(os.getenv("RESEARCH_TIMEOUT", "600"))  # Extended timeout
 PERFORMANCE_TIMEOUT = int(os.getenv("PERFORMANCE_TIMEOUT", "900"))  # Extended timeout for performance analyst (seconds)
 REPORT_TIMEOUT = int(os.getenv("REPORT_TIMEOUT", "600"))  # Extended timeout for morning report (seconds)
 
+# Market session timing — adjust via MARKET_OPEN_TIME (HH:MM, ET) to change when
+# trading agents activate.  Default: 09:30 (NYSE/NASDAQ regular-session open).
+MARKET_OPEN_TIME = os.getenv("MARKET_OPEN_TIME", "09:30")
+_moh, _mom = (int(x) for x in MARKET_OPEN_TIME.split(":"))
+# Minutes that fire during the opening partial hour (e.g. "30,45" for a 9:30 open)
+_open_bell_mins = ",".join(str(m) for m in range(_mom, 60, 15))
+# Context fetch: 5 min before market open (e.g. 9:25 for a 9:30 open)
+_ctx_h = _moh if _mom >= 5 else _moh - 1
+_ctx_m = _mom - 5 if _mom >= 5 else _mom + 55
+
 # Scheduling (cron-style, all times in TIMEZONE)
 # NOTE: APScheduler from_crontab uses ISO weekdays: 0=Mon … 6=Sun
 # (NOT standard cron where 0=Sun). All day-of-week values below
 # use the APScheduler convention.
 #
 # U.S. market hours: 9:30 AM – 4:00 PM ET, Mon–Fri
-HOURLY_CRON = os.getenv("HOURLY_CRON", "0,30 9-15 * * 0-4")  # Every 30 min 9 AM–3:30 PM, Mon–Fri
+# OPEN_BELL_CRON covers the partial opening hour (e.g. 9:30 & 9:45).
+# HOURLY_CRON + RESEARCH_CRON cover full hours from 10 AM onward.
+OPEN_BELL_CRON = os.getenv("OPEN_BELL_CRON", f"{_open_bell_mins} {_moh} * * 0-4")  # Market-open partial hour (e.g. 9:30, 9:45), Mon–Fri
+HOURLY_CRON = os.getenv("HOURLY_CRON", f"0,15,30,45 {_moh + 1}-15 * * 0-4")  # Every 15 min 10 AM–3:45 PM, Mon–Fri
 MORNING_REPORT_CRON = os.getenv("MORNING_REPORT_CRON", "0 7 * * 0-4")  # 7:00 AM weekdays
-RESEARCH_CRON = os.getenv("RESEARCH_CRON", "5/10 9-15 * * 0-4")  # Every 10 min offset by 5 (:05,:15,:25,...) during market hours, Mon–Fri
+RESEARCH_CRON = os.getenv("RESEARCH_CRON", f"5,20,35,50 {_moh + 1}-15 * * 0-4")  # Every 15 min offset by 5 from 10 AM, Mon–Fri
 SENTIMENT_CRON = os.getenv("SENTIMENT_CRON", "0 8,12,16 * * 0-4")  # 8 AM, 12 PM, 4 PM weekdays
-RISK_MONITOR_CRON = os.getenv("RISK_MONITOR_CRON", "*/3 9-15 * * 0-4")  # Every 3 min during market hours
+RISK_MONITOR_CRON = os.getenv("RISK_MONITOR_CRON", f"*/3 {_moh}-15 * * 0-4")  # Every 3 min during market hours (trade guard blocks pre-open execution)
 REBALANCER_CRON = os.getenv("REBALANCER_CRON", "0 6 * * 0")  # 6 AM every Monday
 PERFORMANCE_CRON = os.getenv("PERFORMANCE_CRON", "0 6 * * 4")  # 6 AM every Friday
 EVENTS_CRON = os.getenv("EVENTS_CRON", "0 6 * * 0-4")  # 6 AM weekdays
 EXPANSION_CRON = os.getenv("EXPANSION_CRON", "0 7 * * 2")  # 7 AM every Wednesday
 PLAYBOOK_CRON = os.getenv("PLAYBOOK_CRON", "30 6 * * 4")  # 6:30 AM every Friday (after Performance Analysis at 6 AM)
-MARKET_CONTEXT_CRON = os.getenv("MARKET_CONTEXT_CRON", "55 6 * * 0-4")  # 6:55 AM weekdays (just before market open)
+MARKET_CONTEXT_CRON = os.getenv("MARKET_CONTEXT_CRON", f"{_ctx_m} {_ctx_h} * * 0-4")  # 5 min before market open (e.g. 9:25 AM), weekdays
 
 # ── Overseas market monitor schedules (all times in TIMEZONE / ET) ──
 # Nikkei / Tokyo Stock Exchange

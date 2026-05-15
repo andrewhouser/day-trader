@@ -1,4 +1,12 @@
-# Day Trader Agent
+# ⚠️ This project has been deprecated
+
+**This repository is no longer maintained.** Development has moved to a new project with a machine learning-based approach:
+
+## 👉 [day-trader-ml](https://github.com/andrewhouser/day-trader-ml)
+
+---
+
+# Day Trader Agent (Archived)
 
 A fully autonomous, simulated day-trading agent that monitors global markets around the clock, executes paper trades, and learns from its own performance over time. It starts with $1,000 USD of fake money and runs entirely inside Docker.
 

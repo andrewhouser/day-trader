@@ -67,3 +67,4 @@ trader/momentum_pulse.json
 trader/reports/*.md
 !trader/reports/.gitkeep
 trader/portfolio.json
+CLAUDE.md

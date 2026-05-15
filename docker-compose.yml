@@ -23,10 +23,14 @@ services:
       - NIKKEI_REOPEN_LATE_CRON=${NIKKEI_REOPEN_LATE_CRON:-*/15 0-2 * * 0-4}
       - FTSE_OPEN_CRON=${FTSE_OPEN_CRON:-*/10 2-5 * * 0-4}
       - EUROPE_HANDOFF_CRON=${EUROPE_HANDOFF_CRON:-30 5 * * 0-4}
-      # Core trading loop
-      - HOURLY_CRON=0,15,30,45 9-15 * * 0-4
+      # Core trading loop — starts at 9:30 AM (NYSE/NASDAQ open)
+      # OPEN_BELL_CRON: opening partial hour (9:30 & 9:45)
+      # HOURLY_CRON + RESEARCH_CRON: every 15 min from 10 AM onward
+      - MARKET_OPEN_TIME=09:30
+      - OPEN_BELL_CRON=30,45 9 * * 0-4
+      - HOURLY_CRON=0,15,30,45 10-15 * * 0-4
       - MORNING_REPORT_CRON=0 7 * * 0-4
-      - RESEARCH_CRON=5,20,35,50 9-15 * * 0-4
+      - RESEARCH_CRON=5,20,35,50 10-15 * * 0-4
       - STOP_LOSS_PCT=3.0
       - OPPORTUNITY_PCT=2.0
       - COMPACTION_CRON=0 5 * * 0-4
@@ -37,7 +41,7 @@ services:
       - EVENTS_CRON=0 6 * * 0-4
       - EXPANSION_CRON=0 7 * * 2
       - PLAYBOOK_CRON=30 6 * * 4
-      - MARKET_CONTEXT_CRON=55 6 * * 0-4
+      - MARKET_CONTEXT_CRON=25 9 * * 0-4
       - SPECULATION_CRON=${SPECULATION_CRON:-0 10,13,15 * * 0-4}
       - BEAR_CASE_THRESHOLD_PCT=5.0
       - PLAYBOOK_HIGH_CONFIDENCE_WIN_RATE=0.65

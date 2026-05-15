@@ -136,6 +136,7 @@ JOBS = [
     ("events", "Events Calendar", run_events_calendar, "EVENTS_CRON", 7200),
     ("morning_report", "Morning Report", run_morning_report, "MORNING_REPORT_CRON", 7200),
     # ── U.S. market hours ──
+    ("open_bell", "Market Open Check", run_hourly_check, "OPEN_BELL_CRON", 1800),
     ("research", "Market Research", run_research, "RESEARCH_CRON", 900),
     ("hourly_check", "Market Check", run_hourly_check, "HOURLY_CRON", 1800),
     ("sentiment", "Sentiment Analysis", run_sentiment, "SENTIMENT_CRON", 3600),
